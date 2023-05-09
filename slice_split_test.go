@@ -15,7 +15,6 @@ func makeTestSlice(n int) []int {
 func sum(numbers []int, start int, end int, c chan int) {
 	sum := 0
 	for i := start; i < end; i++ {
-		//fmt.Println(numbers[i])
 		sum += numbers[i]
 	}
 	c <- sum
@@ -47,6 +46,8 @@ func splitSum(c chan int, arr []int, numberOfSplit int) int {
 	return sum
 }
 
+const chanCapacity = 24
+
 var c = make(chan int)
 
 func TestSliceSplit(t *testing.T) {
@@ -72,6 +73,6 @@ func BenchmarkDirectSum(b *testing.B) {
 func BenchmarkSplitSlice(b *testing.B) {
 	arr := makeTestSlice(howMany)
 	for i := 0; i < b.N; i++ {
-		splitSum(c, arr, 16)
+		splitSum(c, arr, chanCapacity)
 	}
 }
