@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <svg width="200" height="200">
+      <!-- Initial 3 green circles -->
+      <circle id="circle1" cx="50" cy="50" r="20" fill="green"></circle>
+      <circle id="circle2" cx="150" cy="50" r="20" fill="green"></circle>
+      <circle id="circle3" cx="100" cy="150" r="20" fill="green"></circle>
+    </svg>
+
+    <script>
+      setTimeout(() => {
+        // Remove one circle
+        const circleToRemove = document.getElementById('circle1');
+        circleToRemove.remove();
+
+        // Add a red square in its place
+        const svg = document.querySelector('svg');
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", 'rect');
+        rect.setAttribute('x', '40');
+        rect.setAttribute('y', '40');
+        rect.setAttribute('width', '20');
+        rect.setAttribute('height', '20');
+        rect.setAttribute('fill', 'red');
+        svg.appendChild(rect);
+      }, 2000);
+    </script>
+  </body>
+</html>

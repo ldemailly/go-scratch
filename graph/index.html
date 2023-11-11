@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <svg id="canvas" width="200" height="200"></svg>
+    <script>
+        // Load initial SVG
+        fetch('/svg')
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('canvas').innerHTML = data;
+            });
+
+        // Connect to WebSocket for updates
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${wsProtocol}://${window.location.host}/ws`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.addEventListener('message', function(event) {
+            // Parse incoming SVG data and add to existing SVG
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(event.data, 'image/svg+xml');
+            const svgElement = doc.querySelector('rect');
+            document.getElementById('canvas').replaceChildren(svgElement);
+        });
+    </script>
+</body>
+</html>
