@@ -1,27 +1,52 @@
 <!DOCTYPE html>
 <html>
 <body>
+    Iteration: <span id="iterationCounter" style="margin-right: 20px;">0</span>
+    <button id="toggleButton">Pause</button>
+    <br />
     <svg id="canvas" width="200" height="200"></svg>
+
     <script>
-        // Load initial SVG
-        fetch('/svg')
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById('canvas').innerHTML = data;
-            });
+        let iteration = 0;
+        let isPolling = true;
+        let interval;
 
-        // Connect to WebSocket for updates
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const wsUrl = `${wsProtocol}://${window.location.host}/ws`;
-        const ws = new WebSocket(wsUrl);
+        function updateIterationDisplay() {
+            document.getElementById('iterationCounter').textContent = iteration;
+        }
 
-        ws.addEventListener('message', function(event) {
-            // Parse incoming SVG data and add to existing SVG
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(event.data, 'image/svg+xml');
-            const svgElement = doc.querySelector('rect');
-            document.getElementById('canvas').replaceChildren(svgElement);
+        function loadSVG() {
+            fetch('/svg?i=' + iteration)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('canvas').innerHTML = data;
+                });
+            iteration++;
+            updateIterationDisplay();
+        }
+
+        function startPolling() {
+            loadSVG();
+            interval = setInterval(loadSVG, 1000);
+        }
+
+        function stopPolling() {
+            clearInterval(interval);
+        }
+
+        document.getElementById('toggleButton').addEventListener('click', function() {
+            if (isPolling) {
+                stopPolling();
+                this.textContent = 'Resume';
+            } else {
+                startPolling();
+                this.textContent = 'Pause';
+            }
+            isPolling = !isPolling;
         });
+
+        // Start initial polling
+        startPolling();
     </script>
 </body>
 </html>
