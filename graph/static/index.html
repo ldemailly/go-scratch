@@ -1,13 +1,18 @@
 <!DOCTYPE html>
 <html>
+<head>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
 <body>
-    Iteration: <span id="iterationCounter" style="margin-right: 20px;">0</span>
+    <label for="nValue">N:</label>
+    <input type="number" id="nValue" value="6" min="0" max="999" style="width: 4em;margin-right: 20px;">
+    Iteration: <span id="iterationCounter" style="margin-right: 20px;"">1</span>
     <button id="toggleButton">Pause</button>
     <br />
-    <svg id="canvas" width="200" height="200"></svg>
+    <svg id="canvas" width="400" height="400"></svg>
 
     <script>
-        let iteration = 0;
+        let iteration = 1;
         let isPolling = true;
         let interval;
 
@@ -16,13 +21,20 @@
         }
 
         function loadSVG() {
-            fetch('/svg?i=' + iteration)
+            let nValue = document.getElementById('nValue').value;
+            if (iteration > nValue) {
+                if (isPolling) {
+                document.getElementById('toggleButton').click();
+                }
+                iteration = nValue;
+            }
+            fetch('/svg?i=' + iteration+ '&n=' + nValue)
                 .then(response => response.text())
                 .then(data => {
                     document.getElementById('canvas').innerHTML = data;
                 });
-            iteration++;
             updateIterationDisplay();
+            iteration++;
         }
 
         function startPolling() {
@@ -43,6 +55,14 @@
                 this.textContent = 'Pause';
             }
             isPolling = !isPolling;
+        });
+
+        document.getElementById('nValue').addEventListener('change', function() {
+            if (isPolling) {
+                document.getElementById('toggleButton').click();
+            }
+            iteration = 1;
+            loadSVG();
         });
 
         // Start initial polling
