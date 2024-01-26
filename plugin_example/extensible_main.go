@@ -1,3 +1,6 @@
+// Basic demo of dynamic code loading using https://pkg.go.dev/plugin
+// requires cgo enabled build.
+
 package main
 
 import (
