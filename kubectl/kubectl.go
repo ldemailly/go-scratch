@@ -29,13 +29,23 @@ func main() {
 	cfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath}, nil)
 
-	rCfg, err := cfg.RawConfig()
+	namespace, nsOver, err := cfg.Namespace()
 	if err != nil {
-		fmt.Printf("error getting raw config: %v\n", err)
+		fmt.Printf("error getting namespace from config: %v\n", err)
 		os.Exit(1)
 	}
-	namespace := rCfg.Contexts[rCfg.CurrentContext].Namespace
-	fmt.Printf("Using (default) namespace: %q\n", namespace)
+	fmt.Printf("Namespace from config: %q (overridden %v)\n", namespace, nsOver)
+	/*
+		// Alternative using RawConfig() which yields "" when no specific namespace is set:
+
+		rCfg, err := cfg.RawConfig()
+		if err != nil {
+			fmt.Printf("error getting raw config: %v\n", err)
+			os.Exit(1)
+		}
+		namespace = rCfg.Contexts[rCfg.CurrentContext].Namespace
+		fmt.Printf("Using (default) namespace: %q\n", namespace)
+	*/
 	kubeConfig, err := cfg.ClientConfig()
 	if err != nil {
 		fmt.Printf("error getting Kubernetes config: %v\n", err)
