@@ -1,8 +1,6 @@
 module github.com/ldemailly/go-scratch
 
-go 1.22.0
-
-toolchain go1.22.4
+go 1.22.4
 
 require (
 	fortio.org/fortio v1.60.3
