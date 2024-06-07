@@ -23,6 +23,9 @@ func main() {
 	kubeConfigPath := filepath.Join(userHomeDir, ".kube", "config")
 	fmt.Printf("Using kubeconfig: %s\n", kubeConfigPath)
 
+	// Instead of using clientcmd.BuildConfigFromFlags("", kubeConfigPath) which doesn't expose
+	// the namespace, we use clientcmd.NewNonInteractiveDeferredLoadingClientConfig which is what
+	// BuildConfigFromFlags() calls internally.
 	cfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath}, nil)
 
