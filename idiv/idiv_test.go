@@ -1,6 +1,7 @@
 package idiv
 
 import (
+	"math"
 	"testing"
 )
 
@@ -27,5 +28,16 @@ func TestDiv1AndDiv2(t *testing.T) {
 			}
 			testSignedPair(t, i, j)
 		}
+	}
+}
+
+func TestBoundary(t *testing.T) {
+	a := math.MinInt32
+	b := (1 << 16)
+	testSignedPair(t, a, b)
+	q, r := Div1(a, b)
+	expected := -(1 << 15)
+	if q != expected || r != 0 {
+		t.Errorf("Div1 returned wrong values for dividend=math.MinInt64, divisor=-1. Expected: %d, %d, Actual: %d, %d", expected, 0, q, r)
 	}
 }
