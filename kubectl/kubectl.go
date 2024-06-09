@@ -9,12 +9,17 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/pflag" // unfortunate it foreces to use pflag.CommandLine instead of flag.CommandLine
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
+	overrides := &clientcmd.ConfigOverrides{}
+	clientcmd.BindOverrideFlags(overrides, pflag.CommandLine, clientcmd.RecommendedConfigOverrideFlags(""))
+	pflag.Parse()
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
 		fmt.Printf("error getting user home dir: %v\n", err)
@@ -27,7 +32,7 @@ func main() {
 	// the namespace, we use clientcmd.NewNonInteractiveDeferredLoadingClientConfig which is what
 	// BuildConfigFromFlags() calls internally.
 	cfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath}, nil)
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath}, overrides)
 
 	namespace, nsOver, err := cfg.Namespace()
 	if err != nil {
