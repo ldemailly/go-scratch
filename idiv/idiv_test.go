@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func testPair(t *testing.T, a, b int) {
+func testPair(t *testing.T, a, b int32) {
 	q1, r1 := Div1(a, b)
 	q2, r2 := Div2(a, b)
 	if q1 != q2 || r1 != r2 {
@@ -13,7 +13,7 @@ func testPair(t *testing.T, a, b int) {
 	}
 }
 
-func testSignedPair(t *testing.T, a, b int) {
+func testSignedPair(t *testing.T, a, b int32) {
 	testPair(t, a, b)
 	testPair(t, a, -b)
 	testPair(t, -a, b)
@@ -26,18 +26,34 @@ func TestDiv1AndDiv2(t *testing.T) {
 			if j == 0 {
 				continue
 			}
-			testSignedPair(t, i, j)
+			testSignedPair(t, int32(i), int32(j))
 		}
 	}
 }
 
 func TestBoundary(t *testing.T) {
-	a := math.MinInt32
-	b := (1 << 16)
+	a := int32(math.MinInt32)
+	b := int32(1 << 16)
 	testSignedPair(t, a, b)
-	q, r := Div1(a, b)
-	expected := -(1 << 15)
+	q, r := Div2(a, b)
+	expected := int32(-(1 << 15))
 	if q != expected || r != 0 {
-		t.Errorf("Div1 returned wrong values for dividend=math.MinInt64, divisor=-1. Expected: %d, %d, Actual: %d, %d", expected, 0, q, r)
+		t.Errorf("Div2 returned wrong values for dividend=math.MinInt64, divisor=-1. Expected: %d, %d, Actual: %d, %d", expected, 0, q, r)
+	}
+}
+
+func TestBoundaryBadImpl(t *testing.T) {
+	a := int32(math.MinInt32)
+	b := int32(1)
+	q, r := Div3(a, b)
+	expected := a
+	if q != expected || r != 0 {
+		t.Errorf("Div3 returned wrong values for dividend=math.MinInt64, divisor=-1. Expected: %d, %d, Actual: %d, %d", expected, 0, q, r)
+	}
+}
+
+func TestAbs(t *testing.T) {
+	if r := abs2(math.MinInt32); r < 0 {
+		t.Errorf("abs1 returned wrong value: %d", r)
 	}
 }
