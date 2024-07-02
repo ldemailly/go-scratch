@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 // Show a client doing n connections to a server
@@ -16,23 +17,24 @@ func main() {
 	flag.Parse()
 	// connect to destination *d n times in parallel
 	for i := 0; i < *n; i++ {
-		go connect(*d)
+		go connect(*d, i+1)
 	}
 	select {}
 }
 
-func connect(dest string) {
-	conn, err := net.Dial("tcp", dest)
+func connect(dest string, id int) {
+	log.Printf("[%d] Attempting connection to %s", id, dest)
+	conn, err := net.DialTimeout("tcp", dest, 10*time.Second)
 	if err != nil {
-		log.Printf("Failed to connect to %s: %v", dest, err)
+		log.Printf("[%d] Failed to connect to %s: %v", id, dest, err)
 		return
 	}
 	defer conn.Close()
-	log.Printf("Connected to %s", dest)
+	log.Printf("[%d] Connected to %s", id, dest)
 	n, err := io.Copy(os.Stderr, conn)
 	if err != nil {
-		log.Printf("Failed to copy data: %v", err)
+		log.Printf("[%d] Failed to copy data: %v", id, err)
 	}
-	log.Printf("Copied %d bytes", n)
+	log.Printf("[%d] Copied %d bytes", id, n)
 	return
 }

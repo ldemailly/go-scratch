@@ -31,17 +31,20 @@ func main() {
 	if err := backlog.Set(listener, *b); err != nil {
 		log.Fatalf("Failed to set backlog: %v", err)
 	}
-	log.Printf("Backlog set to %d", *b)
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Printf("Failed to accept connection: %v", err)
-			continue
+	log.Printf("Backlog set to %d - not accepting any...", *b)
+	// don't actually accept connections so we check the backlog
+	select {}
+	/*
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				log.Printf("Failed to accept connection: %v", err)
+				continue
+			}
+			connCount++
+			go handleConnection(conn, connCount)
 		}
-		connCount++
-		go handleConnection(conn, connCount)
-	}
+	*/
 }
 
 func handleConnection(conn net.Conn, id int) {
