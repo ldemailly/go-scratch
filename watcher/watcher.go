@@ -70,7 +70,7 @@ func main() {
 		case http.StatusOK:
 			etag = resp.Header.Get("ETag")
 			lastModified = resp.Header.Get("Last-Modified")
-			if etag != "" && lastModified != "" {
+			if etag != "" || lastModified != "" {
 				log.S(log.NoLevel, "Content has changed", log.Any("ETag", etag), log.Any("Last-Modified", lastModified))
 			}
 			if bytes.Compare(checksum[:], prevChecksum[:]) != 0 {
