@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -15,11 +17,34 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// openBrowser opens the specified URL in the default browser of the user.
+func openBrowser(url string) error {
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "rundll32"
+		args = append(args, "url.dll,FileProtocolHandler", url)
+	case "darwin":
+		cmd = "open"
+		args = append(args, url)
+	case "linux":
+		cmd = "xdg-open"
+		args = append(args, url)
+	default:
+		return fmt.Errorf("unsupported platform")
+	}
+	return exec.Command(cmd, args...).Start()
+}
+
 func main() {
 	pf := flag.Duration("t", 10*time.Second, "Polling interval")
 	sf := flag.String("s", "", "what to search for in the reply")
 	disableKeepAlive := flag.Bool("k", false, "Disable KeepAlive")
 	disableEtags := flag.Bool("e", false, "Disable ETags")
+	noOpen := flag.Bool("noopen", false, "Do not open the browser upon changes")
+
 	cli.MinArgs = 1
 	cli.MaxArgs = 1
 	cli.ArgsHelp = "url"
@@ -81,10 +106,13 @@ func main() {
 			if etag != "" || lastModified != "" {
 				log.S(log.NoLevel, "Content has changed", log.Any("ETag", etag), log.Any("Last-Modified", lastModified))
 			}
-			if bytes.Compare(checksum[:], prevChecksum[:]) != 0 {
+			if bytes.Compare(checksum[:], prevChecksum[:]) != 0 { // TODO this is getting spaghetti...
 				log.Infof("Content has changed %x", checksum)
 				if prevBody != "" {
 					fmt.Println(cmp.Diff(bodyStr, prevBody))
+					if !(*noOpen) {
+						openBrowser(url)
+					}
 				}
 				prevBody = bodyStr
 				copy(prevChecksum[:], checksum[:])
