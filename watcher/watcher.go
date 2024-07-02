@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -33,7 +34,7 @@ func openBrowser(url string) error {
 		cmd = "xdg-open"
 		args = append(args, url)
 	default:
-		return fmt.Errorf("unsupported platform")
+		return errors.New("unsupported platform")
 	}
 	return exec.Command(cmd, args...).Start()
 }
@@ -106,12 +107,16 @@ func main() {
 			if etag != "" || lastModified != "" {
 				log.S(log.NoLevel, "Content has changed", log.Any("ETag", etag), log.Any("Last-Modified", lastModified))
 			}
-			if bytes.Compare(checksum[:], prevChecksum[:]) != 0 { // TODO this is getting spaghetti...
+			if bytes.Compare(checksum[:], prevChecksum[:]) != 0 {
+				// TODO this is getting spaghetti...
 				log.Infof("Content has changed %x", checksum)
 				if prevBody != "" {
 					fmt.Println(cmp.Diff(bodyStr, prevBody))
 					if !(*noOpen) {
-						openBrowser(url)
+						err = openBrowser(url)
+						if err != nil {
+							log.Fatalf("Error opening browser: %v", err)
+						}
 					}
 				}
 				prevBody = bodyStr
