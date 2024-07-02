@@ -17,7 +17,7 @@ import (
 //
 // On linux `ss -ltn6` will show the backlog as SendQ column.
 //
-// PS: none of this meant to work according to POSIX, it just happens to seem to do so.\
+// PS: none of this meant to work according to POSIX, it just happens to seem to do so
 // pending https://github.com/golang/go/issues/39000
 func Set(l net.Listener, backlog int) error {
 	tl, ok := l.(*net.TCPListener)
