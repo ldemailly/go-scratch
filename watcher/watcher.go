@@ -39,6 +39,99 @@ func openBrowser(url string) error {
 	return exec.Command(cmd, args...).Start()
 }
 
+type State struct {
+	url              string
+	etag             string
+	lastModified     string
+	prevChecksum     [32]byte
+	prevBody         string
+	client           *http.Client
+	disableEtags     bool
+	disableKeepAlive bool
+	search           string
+	doOpen           bool
+}
+
+func (s *State) checkOne() error {
+	req, err := http.NewRequest("GET", s.url, nil)
+	if err != nil {
+		return fmt.Errorf("Error creating request: %w", err)
+	}
+
+	if s.etag != "" && !s.disableEtags {
+		log.Infof("Adding If-None-Match: %q", s.etag)
+		req.Header.Add("If-None-Match", s.etag)
+	}
+	if s.lastModified != "" {
+		log.Infof("Adding If-Modified-Since %q", s.etag)
+		req.Header.Add("If-Modified-Since", s.lastModified)
+	}
+	if s.disableKeepAlive {
+		req.Close = true
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Fatalf("Error doing request: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Error reading body: %v", err)
+	}
+	resp.Body.Close()
+	log.Infof("Got %d code and %d bytes", resp.StatusCode, len(body))
+	log.LogVf("Headers: %+v", resp.Header)
+	// checksum body
+	checksum := sha256.Sum256(body)
+	if len(body) > 0 {
+		log.Infof("Checksum: %x", checksum)
+	}
+	bodyStr := string(body)
+	log.Debugf("Body: %v", bodyStr)
+
+	if s.search != "" {
+		if strings.Contains(bodyStr, s.search) {
+			log.Warnf("Found %q in the body", s.search)
+		}
+	}
+	switch resp.StatusCode {
+	case http.StatusNotModified:
+		log.Infof("Header based content has not changed.")
+	case http.StatusOK:
+		s.etag = resp.Header.Get("ETag")
+		s.lastModified = resp.Header.Get("Last-Modified")
+		if s.etag != "" || s.lastModified != "" {
+			log.S(log.NoLevel, "Content has changed", log.Any("ETag", s.etag), log.Any("Last-Modified", s.lastModified))
+		}
+		if bytes.Compare(checksum[:], s.prevChecksum[:]) == 0 {
+			log.Infof("Content has not changed.")
+			return nil
+		}
+		log.Infof("Content has changed %x", checksum)
+		copy(s.prevChecksum[:], checksum[:])
+		prevBody := s.prevBody
+		s.prevBody = bodyStr
+		if prevBody == "" {
+			log.Debugf("First time body, not comparing.")
+			return nil
+		}
+		fmt.Println(cmp.Diff(bodyStr, prevBody))
+		if !s.doOpen {
+			return nil
+		}
+		err = openBrowser(s.url)
+		if err != nil {
+			return fmt.Errorf("Error opening browser: %w", err)
+		}
+		log.Infof("Opened browser for %q", s.url)
+	case http.StatusNotFound:
+		log.Warnf("Got 404 Not found for %q: %q", s.url, bodyStr)
+		s.prevBody = bodyStr // so when it gets to 200 it will trigger open
+	default:
+		return fmt.Errorf("Unexpected status code: %v", resp.StatusCode)
+	}
+	return nil
+}
+
 func main() {
 	pf := flag.Duration("t", 10*time.Second, "Polling interval")
 	sf := flag.String("s", "", "what to search for in the reply")
@@ -50,87 +143,20 @@ func main() {
 	cli.MaxArgs = 1
 	cli.ArgsHelp = "url"
 	cli.Main()
-	url := flag.Args()[0]
-	pollingInterval := *pf
-	etag := ""
-	lastModified := ""
-	var prevChecksum [32]byte
-	client := &http.Client{}
-	prevBody := ""
-	for {
-		req, err := http.NewRequest("GET", url, nil)
+	state := &State{
+		url:              flag.Args()[0],
+		disableEtags:     *disableEtags,
+		disableKeepAlive: *disableKeepAlive,
+		search:           *sf,
+		doOpen:           !*noOpen,
+		client:           http.DefaultClient,
+	}
+	ticker := time.NewTicker(*pf)
+	err := state.checkOne()
+	for range ticker.C {
 		if err != nil {
-			log.Fatalf("Error creating request: %v", err)
+			log.Fatalf("Error checking: %v", err)
 		}
-
-		if etag != "" && !*disableEtags {
-			log.Infof("Adding If-None-Match: %q", etag)
-			req.Header.Add("If-None-Match", etag)
-		}
-		if lastModified != "" {
-			log.Infof("Adding If-Modified-Since %q", etag)
-			req.Header.Add("If-Modified-Since", lastModified)
-		}
-		if *disableKeepAlive {
-			req.Close = true
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Fatalf("Error doing request: %v", err)
-		}
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalf("Error reading body: %v", err)
-		}
-		resp.Body.Close()
-		log.Infof("Got %d code and %d bytes", resp.StatusCode, len(body))
-		log.LogVf("Headers: %+v", resp.Header)
-		// checksum body
-		checksum := sha256.Sum256(body)
-		if len(body) > 0 {
-			log.Infof("Checksum: %x", checksum)
-		}
-		bodyStr := string(body)
-		log.Debugf("Body: %v", bodyStr)
-
-		if *sf != "" {
-			if strings.Contains(bodyStr, *sf) {
-				log.Warnf("Found %q in the body", *sf)
-			}
-		}
-		switch resp.StatusCode {
-		case http.StatusNotModified:
-			log.Infof("Header based content has not changed.")
-		case http.StatusOK:
-			etag = resp.Header.Get("ETag")
-			lastModified = resp.Header.Get("Last-Modified")
-			if etag != "" || lastModified != "" {
-				log.S(log.NoLevel, "Content has changed", log.Any("ETag", etag), log.Any("Last-Modified", lastModified))
-			}
-			if bytes.Compare(checksum[:], prevChecksum[:]) != 0 {
-				// TODO this is getting spaghetti...
-				log.Infof("Content has changed %x", checksum)
-				if prevBody != "" {
-					fmt.Println(cmp.Diff(bodyStr, prevBody))
-					if !(*noOpen) {
-						err = openBrowser(url)
-						if err != nil {
-							log.Fatalf("Error opening browser: %v", err)
-						}
-					}
-				}
-				prevBody = bodyStr
-				copy(prevChecksum[:], checksum[:])
-			} else {
-				log.Infof("Content has not changed.")
-			}
-		case http.StatusNotFound:
-			log.Warnf("Got 404 Not found for %q: %q", url, bodyStr)
-			prevBody = bodyStr // so when it gets to 200 it will trigger open
-		default:
-			log.Fatalf("Unexpected status code: %v", resp.StatusCode)
-		}
-		log.LogVf("Sleeping for %v", pollingInterval)
-		time.Sleep(pollingInterval)
+		err = state.checkOne()
 	}
 }
