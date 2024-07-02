@@ -36,9 +36,11 @@ func main() {
 		}
 
 		if etag != "" {
+			log.Infof("Adding If-None-Match: %q", etag)
 			req.Header.Add("If-None-Match", etag)
 		}
 		if lastModified != "" {
+			log.Infof("Adding If-Modified-Since %q", etag)
 			req.Header.Add("If-Modified-Since", lastModified)
 		}
 
@@ -55,7 +57,9 @@ func main() {
 		log.LogVf("Headers: %+v", resp.Header)
 		// checksum body
 		checksum := sha256.Sum256(body)
-		log.Infof("Checksum: %x", checksum)
+		if len(body) > 0 {
+			log.Infof("Checksum: %x", checksum)
+		}
 		bodyStr := string(body)
 		log.Debugf("Body: %v", bodyStr)
 
@@ -66,7 +70,7 @@ func main() {
 		}
 		switch resp.StatusCode {
 		case http.StatusNotModified:
-			log.Infof("Content has not changed.")
+			log.Infof("Header based content has not changed.")
 		case http.StatusOK:
 			etag = resp.Header.Get("ETag")
 			lastModified = resp.Header.Get("Last-Modified")
@@ -75,11 +79,11 @@ func main() {
 			}
 			if bytes.Compare(checksum[:], prevChecksum[:]) != 0 {
 				log.Infof("Content has changed %x", checksum)
-				copy(prevChecksum[:], checksum[:])
 				if prevBody != "" {
 					fmt.Println(cmp.Diff(bodyStr, prevBody))
 				}
 				prevBody = bodyStr
+				copy(prevChecksum[:], checksum[:])
 			} else {
 				log.Infof("Content has not changed.")
 			}
