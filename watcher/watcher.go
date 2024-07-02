@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"flag"
@@ -53,9 +54,9 @@ type State struct {
 }
 
 func (s *State) checkOne() error {
-	req, err := http.NewRequest("GET", s.url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, s.url, nil)
 	if err != nil {
-		return fmt.Errorf("Error creating request: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 
 	if s.etag != "" && !s.disableEtags {
@@ -71,11 +72,11 @@ func (s *State) checkOne() error {
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		log.Fatalf("Error doing request: %v", err)
+		return fmt.Errorf("calling Do: %w", err)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("Error reading body: %v", err)
+		return fmt.Errorf("calling ReadAll: %w", err)
 	}
 	resp.Body.Close()
 	log.Infof("Got %d code and %d bytes", resp.StatusCode, len(body))
@@ -102,7 +103,7 @@ func (s *State) checkOne() error {
 		if s.etag != "" || s.lastModified != "" {
 			log.S(log.NoLevel, "Content has changed", log.Any("ETag", s.etag), log.Any("Last-Modified", s.lastModified))
 		}
-		if bytes.Compare(checksum[:], s.prevChecksum[:]) == 0 {
+		if bytes.Equal(checksum[:], s.prevChecksum[:]) {
 			log.Infof("Content has not changed.")
 			return nil
 		}
@@ -120,14 +121,14 @@ func (s *State) checkOne() error {
 		}
 		err = openBrowser(s.url)
 		if err != nil {
-			return fmt.Errorf("Error opening browser: %w", err)
+			return fmt.Errorf("opening browser: %w", err)
 		}
 		log.Infof("Opened browser for %q", s.url)
 	case http.StatusNotFound:
 		log.Warnf("Got 404 Not found for %q: %q", s.url, bodyStr)
 		s.prevBody = bodyStr // so when it gets to 200 it will trigger open
 	default:
-		return fmt.Errorf("Unexpected status code: %v", resp.StatusCode)
+		return fmt.Errorf("unexpected status code: %v", resp.StatusCode)
 	}
 	return nil
 }
