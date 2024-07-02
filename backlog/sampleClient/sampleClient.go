@@ -36,5 +36,4 @@ func connect(dest string, id int) {
 		log.Printf("[%d] Failed to copy data: %v", id, err)
 	}
 	log.Printf("[%d] Copied %d bytes", id, n)
-	return
 }

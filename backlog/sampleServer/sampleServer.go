@@ -11,10 +11,9 @@ import (
 	"github.com/ldemailly/go-scratch/backlog"
 )
 
-// Show a server using a set backlog
+//var connCount int
 
-var connCount int
-
+// Demonstrates a server using a set backlog
 func main() {
 	b := flag.Int("b", 1, "`backlog` to set")
 	p := flag.String("p", ":8118", "`port` to listen on")
@@ -42,19 +41,18 @@ func main() {
 				continue
 			}
 			connCount++
-			go handleConnection(conn, connCount)
+			go HandleConnection(conn, connCount)
 		}
 	*/
 }
 
-func handleConnection(conn net.Conn, id int) {
+func HandleConnection(conn net.Conn, id int) {
 	defer conn.Close()
 	log.Printf("New connection #%d from %s", id, conn.RemoteAddr())
-	conn.Write([]byte(fmt.Sprintf("Hello, connection #%d\n", id)))
+	_, _ = conn.Write([]byte(fmt.Sprintf("Hello, connection #%d\n", id)))
 	n, err := io.Copy(os.Stderr, conn)
 	if err != nil {
 		log.Printf("Failed to copy data: %v", err)
 	}
 	log.Printf("Copied %d bytes", n)
-	return
 }
