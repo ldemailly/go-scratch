@@ -94,42 +94,46 @@ func (s *State) checkOne() error {
 			log.Warnf("Found %q in the body", s.search)
 		}
 	}
-	switch resp.StatusCode {
-	case http.StatusNotModified:
+	if resp.StatusCode == http.StatusNotModified {
 		log.Infof("Header based content has not changed.")
-	case http.StatusOK:
-		s.etag = resp.Header.Get("ETag")
-		s.lastModified = resp.Header.Get("Last-Modified")
-		if s.etag != "" || s.lastModified != "" {
-			log.S(log.NoLevel, "Content has changed", log.Any("ETag", s.etag), log.Any("Last-Modified", s.lastModified))
-		}
-		if bytes.Equal(checksum[:], s.prevChecksum[:]) {
-			log.Infof("Content has not changed.")
-			return nil
-		}
-		log.Infof("Content has changed %x", checksum)
-		copy(s.prevChecksum[:], checksum[:])
-		prevBody := s.prevBody
-		s.prevBody = bodyStr
-		if prevBody == "" {
-			log.Debugf("First time body, not comparing.")
-			return nil
-		}
-		fmt.Println(cmp.Diff(bodyStr, prevBody))
-		if !s.doOpen {
-			return nil
-		}
-		err = openBrowser(s.url)
-		if err != nil {
-			return fmt.Errorf("opening browser: %w", err)
-		}
-		log.Infof("Opened browser for %q", s.url)
-	case http.StatusNotFound:
+		// We don't (re)set the body or checksum in this case
+		return nil
+	}
+	if resp.StatusCode == http.StatusNotFound {
 		log.Warnf("Got 404 Not found for %q: %q", s.url, bodyStr)
-		s.prevBody = bodyStr // so when it gets to 200 it will trigger open
-	default:
+		// bodyStr could be empty and we want to trigger open when status becomes 200
+		s.prevBody = "-404 not found-"
+		return nil
+	}
+	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %v", resp.StatusCode)
 	}
+	s.etag = resp.Header.Get("ETag")
+	s.lastModified = resp.Header.Get("Last-Modified")
+	if s.etag != "" || s.lastModified != "" {
+		log.S(log.NoLevel, "Got headers (and no 304 so likely change)", log.Any("ETag", s.etag), log.Any("Last-Modified", s.lastModified))
+	}
+	if bytes.Equal(checksum[:], s.prevChecksum[:]) {
+		log.Infof("Content has not changed.")
+		return nil
+	}
+	log.Infof("Content has changed %x", checksum)
+	copy(s.prevChecksum[:], checksum[:])
+	prevBody := s.prevBody
+	s.prevBody = bodyStr
+	if prevBody == "" {
+		log.Debugf("First time body, not comparing.")
+		return nil
+	}
+	fmt.Println(cmp.Diff(bodyStr, prevBody))
+	if !s.doOpen {
+		return nil
+	}
+	err = openBrowser(s.url)
+	if err != nil {
+		return fmt.Errorf("opening browser: %w", err)
+	}
+	log.Infof("Opened browser for %q", s.url)
 	return nil
 }
 
