@@ -152,12 +152,13 @@ func main() {
 		doOpen:           !*noOpen,
 		client:           http.DefaultClient,
 	}
-	ticker := time.NewTicker(*pf)
-	err := state.checkOne()
-	for range ticker.C {
+	pollingInterval := *pf
+	for {
+		err := state.checkOne()
 		if err != nil {
 			log.Fatalf("Error checking: %v", err)
 		}
-		err = state.checkOne()
+		log.LogVf("Sleeping for %v", pollingInterval)
+		time.Sleep(pollingInterval)
 	}
 }
