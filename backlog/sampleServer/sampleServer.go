@@ -31,6 +31,7 @@ func main() {
 	if err := backlog.Set(listener, *b); err != nil {
 		log.Fatalf("Failed to set backlog: %v", err)
 	}
+	log.Printf("Backlog set to %d", *b)
 
 	for {
 		conn, err := listener.Accept()
