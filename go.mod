@@ -3,9 +3,11 @@ module github.com/ldemailly/go-scratch
 go 1.22.4
 
 require (
+	fortio.org/cli v1.4.2
 	fortio.org/fortio v1.60.3
 	fortio.org/log v1.11.0
 	fortio.org/scli v1.12.0
+	github.com/google/go-cmp v0.6.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	k8s.io/apimachinery v0.30.1
@@ -13,7 +15,6 @@ require (
 )
 
 require (
-	fortio.org/cli v1.4.2 // indirect
 	fortio.org/dflag v1.6.0 // indirect
 	fortio.org/sets v1.0.3 // indirect
 	fortio.org/version v1.0.3 // indirect
