@@ -124,6 +124,9 @@ func main() {
 			} else {
 				log.Infof("Content has not changed.")
 			}
+		case http.StatusNotFound:
+			log.Warnf("Got 404 Not found for %q: %q", url, bodyStr)
+			prevBody = bodyStr // so when it gets to 200 it will trigger open
 		default:
 			log.Fatalf("Unexpected status code: %v", resp.StatusCode)
 		}
