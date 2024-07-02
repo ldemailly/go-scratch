@@ -11,9 +11,9 @@ import (
 	"github.com/ldemailly/go-scratch/backlog"
 )
 
-//var connCount int
+// var connCount int
 
-// Demonstrates a server using a set backlog
+// Demonstrates a server using a set backlog.
 func main() {
 	b := flag.Int("b", 1, "`backlog` to set")
 	p := flag.String("p", ":8118", "`port` to listen on")

@@ -16,7 +16,7 @@ func main() {
 	d := flag.String("d", "localhost:8118", "`destination` to connect to")
 	flag.Parse()
 	// connect to destination *d n times in parallel
-	for i := 0; i < *n; i++ {
+	for i := range *n {
 		go connect(*d, i+1)
 	}
 	select {}
