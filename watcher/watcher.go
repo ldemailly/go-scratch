@@ -125,7 +125,7 @@ func (s *State) checkOne() error {
 		log.Debugf("First time body, not comparing.")
 		return nil
 	}
-	fmt.Println(cmp.Diff(bodyStr, prevBody))
+	fmt.Println(cmp.Diff(prevBody, bodyStr))
 	if !s.doOpen {
 		return nil
 	}
