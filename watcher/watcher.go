@@ -18,6 +18,8 @@ import (
 func main() {
 	pf := flag.Duration("t", 10*time.Second, "Polling interval")
 	sf := flag.String("s", "", "what to search for in the reply")
+	disableKeepAlive := flag.Bool("k", false, "Disable KeepAlive")
+	disableEtags := flag.Bool("e", false, "Disable ETags")
 	cli.MinArgs = 1
 	cli.MaxArgs = 1
 	cli.ArgsHelp = "url"
@@ -35,7 +37,7 @@ func main() {
 			log.Fatalf("Error creating request: %v", err)
 		}
 
-		if etag != "" {
+		if etag != "" && !*disableEtags {
 			log.Infof("Adding If-None-Match: %q", etag)
 			req.Header.Add("If-None-Match", etag)
 		}
@@ -43,7 +45,9 @@ func main() {
 			log.Infof("Adding If-Modified-Since %q", etag)
 			req.Header.Add("If-Modified-Since", lastModified)
 		}
-
+		if *disableKeepAlive {
+			req.Close = true
+		}
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Fatalf("Error doing request: %v", err)
