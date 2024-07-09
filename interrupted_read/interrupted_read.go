@@ -10,9 +10,18 @@ import (
 	"time"
 
 	"fortio.org/log"
+	"fortio.org/scli"
 )
 
 func main() {
+	c, err := net.Dial("tcp", "0.0.0.0:8080")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer c.Close()
+	fmt.Println("Connection successful")
+	scli.UntilInterrupted()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
