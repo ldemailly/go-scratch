@@ -102,14 +102,19 @@ func BenchmarkMapSetAnyWithInt(b *testing.B) {
 }
 
 func BenchmarkObjMapWithString(b *testing.B) {
-	//b.Log("BenchmarkMapSet", b.N)
 	m := make(objMap)
 	o := &Str{Value: "foo"}
-	// m[42] = 42
 	for i := 0; i < b.N; i++ {
 		m[o]++
 	}
-	//b.Log(m["foo"])
+}
+
+func BenchmarkAnyMapWithStringStruct(b *testing.B) {
+	m := make(anyMap)
+	o := &Str{Value: "foo"}
+	for i := 0; i < b.N; i++ {
+		m[o]++
+	}
 }
 
 func BenchmarkObjMapWithInt(b *testing.B) {
