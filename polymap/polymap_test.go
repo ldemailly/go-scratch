@@ -5,12 +5,17 @@ $ go test -bench . -benchtime 10000000x
 goos: darwin
 goarch: arm64
 pkg: github.com/ldemailly/go-scratch/polymap
-BenchmarkMapSetStr-11              	10000000	         8.908 ns/op
-BenchmarkMapSetInt-11              	10000000	         5.742 ns/op
-BenchmarkMapSetAnyWithString-11    	10000000	        20.57 ns/op
-BenchmarkMapSetAnyWithInt-11       	10000000	        14.20 ns/op
-BenchmarkObjMapWithString-11       	10000000	        13.41 ns/op
-BenchmarkObjMapWithInt-11          	10000000	        13.44 ns/op
+goos: darwin
+goarch: arm64
+pkg: github.com/ldemailly/go-scratch/polymap
+BenchmarkStringSetString-11           	10000000	         9.505 ns/op
+BenchmarkIntSetInt-11                 	10000000	         5.782 ns/op
+BenchmarkAnySetString-11              	10000000	        18.91 ns/op
+BenchmarkAnySetInt-11                 	10000000	        14.23 ns/op
+BenchmarkObjMapWithStrinStruct-11     	10000000	        46.55 ns/op
+BenchmarkAnyMapWithStringStruct-11    	10000000	        46.13 ns/op
+BenchmarkAnyMapWithStringPtr-11       	10000000	        13.12 ns/op
+BenchmarkObjMapWithIntStruct-11       	10000000	        15.63 ns/op
 */
 
 import (
@@ -20,7 +25,7 @@ import (
 type strMap map[string]int
 type intMap map[int]int
 type anyMap map[any]int
-type objMap map[Object]int
+type objMap map[Object]int // perf wise this is really same as `anyMap`
 
 type Type uint8
 
@@ -36,9 +41,10 @@ const (
 
 type Int struct {
 	Value int
+	//fn    func() // indirect way to confirm deep equality (ie panic for not hashble)
 }
 
-func (i *Int) Type() Type {
+func (i Int) Type() Type {
 	return INT
 }
 
@@ -55,9 +61,10 @@ func (i *Int) Type() Type {
 */
 type Str struct {
 	Value string
+	// fn    func() // indirect way to confirm deep equality (ie panic for not hashble)
 }
 
-func (s *Str) Type() Type {
+func (s Str) Type() Type {
 	return STR
 }
 
@@ -66,7 +73,7 @@ func (s *Str) Type() Type {
 		return []byte(s.Value)
 	}
 */
-func BenchmarkMapSetStr(b *testing.B) {
+func BenchmarkStringSetString(b *testing.B) {
 	//b.Log("BenchmarkMapSet", b.N)
 	m := make(strMap)
 	for i := 0; i < b.N; i++ {
@@ -75,51 +82,54 @@ func BenchmarkMapSetStr(b *testing.B) {
 	//b.Log(m["foo"])
 }
 
-func BenchmarkMapSetInt(b *testing.B) {
-	//b.Log("BenchmarkMapSet", b.N)
+func BenchmarkIntSetInt(b *testing.B) {
 	m := make(intMap)
 	for i := 0; i < b.N; i++ {
 		m[42]++
 	}
-	//b.Log(m["foo"])
 }
 
-func BenchmarkMapSetAnyWithString(b *testing.B) {
-	//b.Log("BenchmarkMapSet", b.N)
+func BenchmarkAnySetString(b *testing.B) {
 	m := make(anyMap)
-	// m[42] = 42
 	for i := 0; i < b.N; i++ {
 		m["foo"]++
 	}
-	//b.Log(m["foo"])
 }
 
-func BenchmarkMapSetAnyWithInt(b *testing.B) {
+func BenchmarkAnySetInt(b *testing.B) {
 	m := make(anyMap)
 	for i := 0; i < b.N; i++ {
 		m[42]++
 	}
 }
 
-func BenchmarkObjMapWithString(b *testing.B) {
+func BenchmarkObjMapWithStrinStruct(b *testing.B) {
 	m := make(objMap)
-	o := &Str{Value: "foo"}
+	o := Str{Value: "foo"}
 	for i := 0; i < b.N; i++ {
-		m[o]++
+		m[o]++ // lets you pass &o too which changes correctness
 	}
 }
 
 func BenchmarkAnyMapWithStringStruct(b *testing.B) {
-	m := make(anyMap)
-	o := &Str{Value: "foo"}
+	m := make(anyMap) // it's same as objMap in that case
+	o := Str{Value: "foo"}
 	for i := 0; i < b.N; i++ {
 		m[o]++
 	}
 }
 
-func BenchmarkObjMapWithInt(b *testing.B) {
+func BenchmarkAnyMapWithStringPtr(b *testing.B) {
+	m := make(anyMap)
+	key := "foo"
+	for i := 0; i < b.N; i++ {
+		m[&key]++ // but this is not correct for equality
+	}
+}
+
+func BenchmarkObjMapWithIntStruct(b *testing.B) {
 	m := make(objMap)
-	o := &Int{Value: 42}
+	o := Int{Value: 42}
 	for i := 0; i < b.N; i++ {
 		m[o]++
 	}
