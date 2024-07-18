@@ -33,7 +33,6 @@ func main() {
 	scli.ServerMain()
 	mux := http.NewServeMux()
 	server := &http.Server{
-		Addr:              *port,
 		ReadHeaderTimeout: timeout.Get(),
 		IdleTimeout:       timeout.Get(),
 		Handler:           mux,
@@ -49,7 +48,6 @@ func main() {
 	}
 	log.Infof("Listening on %v", l.Addr())
 	go func() {
-		log.Infof("Serving on %v", server.Addr)
 		err := server.Serve(l)
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			panic(err)
