@@ -3,13 +3,14 @@ module tinyhttp
 go 1.22
 
 require (
+	fortio.org/dflag v1.7.2
 	fortio.org/log v1.15.0-pre4
 	fortio.org/scli v1.15.1
+	github.com/stealthrocket/net v0.2.1
 )
 
 require (
 	fortio.org/cli v1.7.0 // indirect
-	fortio.org/dflag v1.7.2 // indirect
 	fortio.org/sets v1.1.1 // indirect
 	fortio.org/struct2env v0.4.1 // indirect
 	fortio.org/version v1.0.4 // indirect

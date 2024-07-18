@@ -11,6 +11,7 @@ import (
 	"fortio.org/dflag/endpoint"
 	"fortio.org/log"
 	"fortio.org/scli"
+	_ "github.com/stealthrocket/net/http"
 )
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
