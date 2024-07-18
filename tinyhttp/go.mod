@@ -1,6 +1,6 @@
 module tinyhttp
 
-go 1.22
+go 1.22.5
 
 require (
 	fortio.org/dflag v1.7.2

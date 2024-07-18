@@ -7,9 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	/* To test without wasi, uncomment and cooment out the last 2
-	wasip1 "net"
-	*/
+	// To test without wasi, uncomment and cooment out the last 2 imports
+	// wasip1 "net"
 	"fortio.org/dflag"
 	"fortio.org/dflag/endpoint"
 	"fortio.org/log"
@@ -53,6 +52,7 @@ func main() {
 	}
 	log.Infof("Listening on %v", l.Addr())
 	go func() {
+		log.Infof("Server entering listen")
 		err := server.Serve(l)
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			panic(err)
