@@ -7,10 +7,15 @@ import (
 	"net/http"
 	"time"
 
+	/* To test without wasi, uncomment and cooment out the last 2
+	wasip1 "net"
+	*/
 	"fortio.org/dflag"
 	"fortio.org/dflag/endpoint"
 	"fortio.org/log"
 	"fortio.org/scli"
+
+	// these:
 	_ "github.com/stealthrocket/net/http"
 	"github.com/stealthrocket/net/wasip1"
 )
