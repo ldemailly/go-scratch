@@ -12,6 +12,7 @@ import (
 	"fortio.org/log"
 	"fortio.org/scli"
 	_ "github.com/stealthrocket/net/http"
+	"github.com/stealthrocket/net/wasip1"
 )
 
 func helloHandler(w http.ResponseWriter, r *http.Request) {
@@ -42,9 +43,14 @@ func main() {
 	dflagEndpoint := endpoint.NewFlagsEndpoint(flag.CommandLine, "/flags/set")
 	mux.HandleFunc("/flags", log.LogAndCall("dflags-get", dflagEndpoint.ListFlags))
 	mux.HandleFunc("/flags/set", log.LogAndCall("dflags-set", dflagEndpoint.SetFlag))
+	l, err := wasip1.Listen("tcp", *port)
+	if err != nil {
+		log.Fatalf("Unable to listen: %v", err)
+	}
+	log.Infof("Listening on %v", l.Addr())
 	go func() {
 		log.Infof("Serving on %v", server.Addr)
-		err := server.ListenAndServe()
+		err := server.Serve(l)
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			panic(err)
 		}
