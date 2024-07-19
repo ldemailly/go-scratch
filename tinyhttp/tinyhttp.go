@@ -57,7 +57,8 @@ func main() {
 	dflagEndpoint := endpoint.NewFlagsEndpoint(flag.CommandLine, "/flags/set")
 	mux.HandleFunc("/flags", log.LogAndCall("dflags-get", dflagEndpoint.ListFlags))
 	mux.HandleFunc("/flags/set", log.LogAndCall("dflags-set", dflagEndpoint.SetFlag))
-	// Serve (accept) must be on main thread somehow - waspi restriction. BUG?
+	// Trying to wait on a signal makes the http server unable to dispatch requests - BUG?
+	// See https://gist.github.com/ldemailly/ddaa31a172350c0014b92c9be2037375
 	l, err := wasip1.Listen("tcp4", *port)
 	if err != nil {
 		log.Fatalf("Unable to listen: %v", err)
