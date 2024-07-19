@@ -4,7 +4,7 @@ go 1.22.5
 
 require (
 	fortio.org/dflag v1.7.2
-	fortio.org/log v1.15.0-pre4
+	fortio.org/log v1.15.0
 	fortio.org/scli v1.15.1
 	github.com/stealthrocket/net v0.2.1
 )
