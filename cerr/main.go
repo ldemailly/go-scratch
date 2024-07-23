@@ -17,7 +17,10 @@ typedef struct {
 Result getResult() {
     Result res;
     res.myOtherResult = 42;
-    snprintf(res.myError, sizeof(res.myError), "This is a C error %d", 1234567890);
+    int n = snprintf(res.myError, sizeof(res.myError), "This is a C error %d", 1234567890);
+    if (n >= sizeof(res.myError)) {
+        fprintf(stderr, "C Warning: snprintf was truncated %d\n", n);
+    }
     return res;
 }
 */
