@@ -23,6 +23,7 @@ Result getResult() {
     }
     return res;
 }
+#cgo CFLAGS: -Wno-unknown-warning-option -Wno-format-truncation
 */
 import "C"
 import (
