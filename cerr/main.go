@@ -1,19 +1,23 @@
 package main
 
 /*
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#define MAX 256  // Define a maximum buffer size
 
 // Define a struct to hold the int and the error message
 typedef struct {
     int myOtherResult;
-    const char *myError;
+    char myError[MAX];
 } Result;
 
-// Function that returns the struct
+// Function that returns the struct with dynamic memory allocation
 Result getResult() {
     Result res;
     res.myOtherResult = 42;
-    res.myError = "This is an error message from C";
+    snprintf(res.myError, sizeof(res.myError), "This is a C error %d", 23);
     return res;
 }
 */
@@ -31,7 +35,7 @@ func getResult() (int, error) {
 	code := int(res.myOtherResult)
 
 	// Convert the C string to a Go string
-	eMsg := C.GoString(res.myError)
+	eMsg := C.GoString(&res.myError[0])
 	if eMsg == "" {
 		return code, nil
 	}
@@ -42,7 +46,6 @@ func main() {
 	i, err := getResult()
 	if err != nil {
 		fmt.Println("Error:", err)
-		return
 	}
 	fmt.Println("Result:", i)
 }
