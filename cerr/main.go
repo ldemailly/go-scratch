@@ -5,7 +5,7 @@ package main
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX 256  // Define a maximum buffer size
+#define MAX 24  // demos safe truncation
 
 // Define a struct to hold the int and the error message
 typedef struct {
@@ -17,7 +17,7 @@ typedef struct {
 Result getResult() {
     Result res;
     res.myOtherResult = 42;
-    snprintf(res.myError, sizeof(res.myError), "This is a C error %d", 23);
+    snprintf(res.myError, sizeof(res.myError), "This is a C error %d", 1234567890);
     return res;
 }
 */
