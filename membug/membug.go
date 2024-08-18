@@ -9,6 +9,16 @@ import (
 	"time"
 )
 
+func FreeMemory() {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	currentAlloc := memStats.HeapAlloc
+	gomemlimit := debug.SetMemoryLimit(-1)
+
+	fmt.Printf("*** Current HeapAlloc: %d bytes\n", currentAlloc)
+	fmt.Printf("*** Usage percentage: %.2f%%\n", (float64(currentAlloc)/float64(gomemlimit))*100)
+}
+
 // go build . && GOMEMLIMIT=30MiB GODEBUG=gcstoptheworld=1,gctrace=1 ./membug
 func main() {
 	defer func() {
@@ -22,14 +32,17 @@ func main() {
 	l = debug.SetMemoryLimit(newLimit) // twice to confirm we did change something
 	runtime.GC()
 	time.Sleep(1 * time.Second)
+	FreeMemory()
 	log.Printf("### Post initial GC, Old limit: %d, new %d", oldLimit, l)
 	v1 := strings.Repeat("ABC", 4*int(newLimit)) // ie 12x the limit
 	runtime.GC()
 	time.Sleep(1 * time.Second)
+	FreeMemory()
 	log.Printf("### 1. post 2nd GC no panic... len: %d", len(v1))
 	a1 := make([]byte, 10*int(newLimit)) // now at 22x the limit
 	runtime.GC()
 	time.Sleep(1 * time.Second)
+	FreeMemory()
 	log.Printf("### 2. post 3rd GC no panic... a1 cap: %d", cap(a1))
 	copy(a1, []byte(v1))
 	runtime.GC()
