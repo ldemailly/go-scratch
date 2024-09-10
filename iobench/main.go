@@ -9,16 +9,20 @@ import (
 	"os"
 
 	"github.com/ldemailly/go-scratch/iobench/blockio"
+	"github.com/ldemailly/go-scratch/iobench/optio"
 )
 
 func main() {
-	var filename string
-	var mode string
-	var bufferSize int
+	var filename, mode string
+	var bufferSize, readSize, maxLineLength int
 	flag.StringVar(&filename, "filename", "genfile/random_lines.txt", "Output filename")
-	flag.StringVar(&mode, "mode", "blockio", "Mode to run: blockio, scanner, optio")
-	flag.IntVar(&bufferSize, "bufferSize", 64*1024, "Buffer size")
+	flag.StringVar(&mode, "mode", "optio", "Mode to run: blockio, scanner, optio")
+	flag.IntVar(&bufferSize, "bufferSize", 1024, "Buffer size in kb")
+	flag.IntVar(&readSize, "readSize", 128, "Optio unit of read size in kb")
+	flag.IntVar(&maxLineLength, "maxline", 256, "Max line length in bytes")
 	flag.Parse()
+	bufferSize *= 1024
+	readSize *= 1024
 	f, err := os.Open(filename)
 	if err != nil {
 		panic(err)
@@ -33,7 +37,7 @@ func main() {
 	case "scanner":
 		processScanner(f, bufferSize)
 	case "optio":
-		processOptio(f, bufferSize)
+		processOptio(f, bufferSize, readSize, maxLineLength)
 	default:
 		panic("Unknown/unimplemented mode " + mode)
 	}
@@ -60,7 +64,7 @@ func processBlockio(f io.Reader, bufferSize int) {
 			maxV = length
 		}
 	}
-	println("BLOCKIO Lines:", lines, "minV:", minV, "Max:", maxV, "Total:", total)
+	println("BLOCKIO Lines:\t", lines, "minV:", minV, "Max:", maxV, "Total:", total)
 }
 
 func processScanner(f io.Reader, bufferSize int) {
@@ -74,9 +78,6 @@ func processScanner(f io.Reader, bufferSize int) {
 	for s.Scan() {
 		line := s.Bytes()
 		length := len(line)
-		if length == 0 {
-			break
-		}
 		lines++
 		total += length
 		if length < minV {
@@ -86,33 +87,29 @@ func processScanner(f io.Reader, bufferSize int) {
 			maxV = length
 		}
 	}
-	println("BUFIO Scanner Lines:", lines, "minV:", minV, "Max:", maxV, "Total:", total)
+	println("Scanner Lines:\t", lines, "minV:", minV, "Max:", maxV, "Total:", total)
 }
 
-func processOptio(f io.Reader, bufferSize int) {
+func processOptio(f io.Reader, bufferSize int, readSize int, maxLineLength int) {
 	minV := math.MaxInt
 	maxV := 0
 	total := 0
 	lines := 0
-	/*
-		s := optio.NewScanner(f)
-		s.Buffer(make([]byte, 0, bufferSize), bufferSize)
-
-		for s.Scan() {
-			line := s.Bytes()
-			length := len(line)
-			if length == 0 {
-				break
-			}
-			lines++
-			total += length
-			if length < minV {
-				minV = length
-			}
-			if length > maxV {
-				maxV = length
-			}
+	s := optio.LineScanner(f, bufferSize, readSize, maxLineLength)
+	for !s.EOF() {
+		line, err := s.Line()
+		if err != nil {
+			panic(err)
 		}
-	*/
-	println("OPTIO Lines:", lines, "minV:", minV, "Max:", maxV, "Total:", total)
+		length := len(line)
+		lines++
+		total += length
+		if length < minV {
+			minV = length
+		}
+		if length > maxV {
+			maxV = length
+		}
+	}
+	println("OPTIO Lines:\t", lines, "minV:", minV, "Max:", maxV, "Total:", total)
 }

@@ -19,7 +19,7 @@ func main() {
 	var filename string
 	flag.IntVar(&minLen, "minLen", 7, "Minimum length of a line")
 	flag.IntVar(&maxLen, "maxLen", 250, "Maximum length of a line")
-	flag.IntVar(&lineCount, "lineCount", 10_000_000, "Number of lines")
+	flag.IntVar(&lineCount, "lineCount", 20_000_000, "Number of lines")
 	flag.StringVar(&filename, "filename", "random_lines.txt", "Output filename")
 	flag.Parse()
 	fmt.Println("charset len:", len(charset))
