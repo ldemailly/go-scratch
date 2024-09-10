@@ -29,14 +29,12 @@ func BuildRecordSource(istr io.Reader, capacity int) *RecordSource {
 
 func (rs *RecordSource) FillBuffer() {
 	if !rs.isEof {
-
 		if rs.begin > 0 {
 			copy(rs.buffer, rs.buffer[rs.begin:rs.begin+rs.numAvailable])
 			rs.begin = 0
 		}
 
 		num_read, err := rs.is.Read(rs.buffer[rs.numAvailable:rs.capacity])
-
 		if err != nil {
 			if err == io.EOF {
 				rs.isEof = true

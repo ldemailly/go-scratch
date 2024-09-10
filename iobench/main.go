@@ -34,8 +34,8 @@ func main() {
 
 func processBlockio(f io.Reader, bufferSize int) {
 	rs := blockio.BuildRecordSource(f, bufferSize)
-	min := math.MaxInt
-	max := 0
+	minV := math.MaxInt
+	maxV := 0
 	total := 0
 	lines := 0
 	for {
@@ -46,21 +46,21 @@ func processBlockio(f io.Reader, bufferSize int) {
 		}
 		lines++
 		total += length
-		if length < min {
-			min = length
+		if length < minV {
+			minV = length
 		}
-		if length > max {
-			max = length
+		if length > maxV {
+			maxV = length
 		}
 	}
-	println("Lines:", lines, "Min:", min, "Max:", max, "Total:", total)
+	println("BLOCKIO Lines:", lines, "minV:", minV, "Max:", maxV, "Total:", total)
 }
 
 func processScanner(f io.Reader, bufferSize int) {
 	s := bufio.NewScanner(f)
 	s.Buffer(make([]byte, 0, bufferSize), bufferSize)
-	min := math.MaxInt
-	max := 0
+	minV := math.MaxInt
+	maxV := 0
 	total := 0
 	lines := 0
 
@@ -72,12 +72,12 @@ func processScanner(f io.Reader, bufferSize int) {
 		}
 		lines++
 		total += length
-		if length < min {
-			min = length
+		if length < minV {
+			minV = length
 		}
-		if length > max {
-			max = length
+		if length > maxV {
+			maxV = length
 		}
 	}
-	println("Lines:", lines, "Min:", min, "Max:", max, "Total:", total)
+	println("BUFIO Scanner Lines:", lines, "minV:", minV, "Max:", maxV, "Total:", total)
 }
