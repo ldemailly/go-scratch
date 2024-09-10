@@ -41,8 +41,7 @@ func main() {
 }
 
 func randomString(buf []byte, length int) {
-	b := buf[:length]
-	for i := range b {
-		b[i] = charset[rand.IntN(len(charset))] //nolint: gosec // not crypto rand.
+	for i := range length {
+		buf[i] = charset[rand.IntN(len(charset))] //nolint: gosec // not crypto rand.
 	}
 }
