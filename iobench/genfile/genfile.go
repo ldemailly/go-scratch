@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"math/rand/v2"
@@ -28,15 +29,17 @@ func main() {
 		return
 	}
 	defer file.Close()
+	f := bufio.NewWriter(file)
 	buf := make([]byte, maxLen+1)
 	totalSize := int64(0)
 	for range lineCount {
 		length := rand.IntN(maxLen-minLen+1) + minLen //nolint: gosec // not crypto rand.
 		randomString(buf, length)
 		buf[length] = '\n'
-		n, _ := file.Write(buf[:length+1])
+		n, _ := f.Write(buf[:length+1])
 		totalSize += int64(n)
 	}
+	f.Flush()
 	fmt.Printf("File generated: %q, %d lines, total size %d\n", filename, lineCount, totalSize)
 }
 
