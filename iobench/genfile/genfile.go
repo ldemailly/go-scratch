@@ -8,7 +8,8 @@ import (
 )
 
 // Spaces 4 times more frequent... just to pretend to make it more readable.
-const charset = " abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789_. "
+// also have it have 64 characters, (could) make the randomString() faster.
+const charset = " abcdefghijkmnopqrstuvwxyz ABCDEFGHJKLMNOPQRSTUVWXYZ 0123456789 "
 
 func main() {
 	var minLen int
@@ -20,7 +21,7 @@ func main() {
 	flag.IntVar(&lineCount, "lineCount", 2_000_000, "Number of lines")
 	flag.StringVar(&filename, "filename", "random_lines.txt", "Output filename")
 	flag.Parse()
-
+	fmt.Println("charset len:", len(charset))
 	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Println("Error creating file:", err)
@@ -36,7 +37,7 @@ func main() {
 		n, _ := file.Write(buf[:length+1])
 		totalSize += int64(n)
 	}
-	fmt.Printf("File generated: %q, %d lines, total size %d", filename, lineCount, totalSize)
+	fmt.Printf("File generated: %q, %d lines, total size %d\n", filename, lineCount, totalSize)
 }
 
 func randomString(buf []byte, length int) {
