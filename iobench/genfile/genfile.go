@@ -7,43 +7,41 @@ import (
 	"os"
 )
 
-var (
-	minLen    int
-	maxLen    int
-	lineCount int
-)
+// Spaces 4 times more frequent... just to pretend to make it more readable.
+const charset = " abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789_. "
 
-const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-func init() {
+func main() {
+	var minLen int
+	var maxLen int
+	var lineCount int
+	var filename string
 	flag.IntVar(&minLen, "minLen", 7, "Minimum length of a line")
 	flag.IntVar(&maxLen, "maxLen", 250, "Maximum length of a line")
 	flag.IntVar(&lineCount, "lineCount", 2_000_000, "Number of lines")
-}
-
-func main() {
+	flag.StringVar(&filename, "filename", "random_lines.txt", "Output filename")
 	flag.Parse()
 
-	file, err := os.Create("random_lines.txt")
+	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Println("Error creating file:", err)
 		return
 	}
 	defer file.Close()
-
-	for i := 0; i < lineCount; i++ {
-		length := rand.IntN(maxLen-minLen+1) + minLen
-		line := randomString(length)
-		file.WriteString(line + "\n")
+	buf := make([]byte, maxLen+1)
+	totalSize := int64(0)
+	for range lineCount {
+		length := rand.IntN(maxLen-minLen+1) + minLen //nolint: gosec // not crypto rand.
+		randomString(buf, length)
+		buf[length] = '\n'
+		n, _ := file.Write(buf[:length+1])
+		totalSize += int64(n)
 	}
-
-	fmt.Println("File generated: random_lines.txt")
+	fmt.Printf("File generated: %q, %d lines, total size %d", filename, lineCount, totalSize)
 }
 
-func randomString(length int) string {
-	b := make([]byte, length)
+func randomString(buf []byte, length int) {
+	b := buf[:length]
 	for i := range b {
-		b[i] = charset[rand.IntN(len(charset))]
+		b[i] = charset[rand.IntN(len(charset))] //nolint: gosec // not crypto rand.
 	}
-	return string(b)
 }
