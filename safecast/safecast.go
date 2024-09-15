@@ -1,3 +1,5 @@
+// Moved to [fortio.org/safecast](https://pkg.go.dev/fortio.org/safecast).
+//
 // Package safecast allows you to safely cast between numeric types in Go and return errors (or panic when using the
 // Must* variants) when the cast would result in a loss of precision, range or sign.
 package safecast
