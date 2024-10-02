@@ -39,6 +39,15 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func panicHandler1(w http.ResponseWriter, r *http.Request) {
+	panic("Direct Panic for testing")
+}
+
+func panicHandler2(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Hello, before panic!"))
+	panic("Panic for testing, after writing")
+}
+
 func main() {
 	timeout := dflag.New(3*time.Second, "timeout for the http server")
 	dflag.Flag("timeout", timeout)
@@ -51,6 +60,8 @@ func main() {
 		Handler:           mux,
 		ErrorLog:          log.NewStdLogger("http srv", log.Error),
 	}
+	mux.HandleFunc("/panic1", log.LogAndCall("http srv", panicHandler1))
+	mux.HandleFunc("/panic2", log.LogAndCall("http srv", panicHandler2))
 	mux.HandleFunc("/", log.LogAndCall("http srv", helloHandler))
 	dflagEndpoint := endpoint.NewFlagsEndpoint(flag.CommandLine, "/flags/set")
 	mux.HandleFunc("/flags", log.LogAndCall("dflags-get", dflagEndpoint.ListFlags))
