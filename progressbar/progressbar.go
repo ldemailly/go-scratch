@@ -33,8 +33,8 @@ func ProgressBar(progress float64, useColors bool) {
 	color := Color
 	reset := Reset
 	if !useColors {
-		color = ""
-		reset = ""
+		color = "◅" // "◢"
+		reset = "▻" // "◣"
 	}
 	bar := color + strings.Repeat(Full, fullCount) + FractionalBlocks[remainder] + strings.Repeat(Space, spaceCount) + reset
 	fmt.Printf("\r%s %.1f%%", bar, progress*100)
