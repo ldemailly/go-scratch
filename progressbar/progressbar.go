@@ -1,4 +1,5 @@
 // Example of simple progress bar in Go + printing something above it too
+// Moved to fortio.org/progressbar (github.com/fortio/progressbar) for reuse.
 package main
 
 import (
