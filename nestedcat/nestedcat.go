@@ -39,7 +39,7 @@ func main() {
 	}
 	// Pass file to child process
 	ourName := os.Args[0]
-	fname := flag.Arg(1)
+	fname := flag.Arg(0)
 	sub := exec.Cmd{
 		Path: ourName,
 		Args: []string{ourName, "-f", fname},
