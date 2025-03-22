@@ -1,6 +1,10 @@
 /*
  Demonstrates that you can cmd.Exec and pass a file name
  to a sub executable (in this case itself)
+   go run . some_file.txt
+ will run the program and pass the file name to the sub process which will cat it
+ (it uses -f to decide if it's in the child process or not (note that passing "" tricks it a bit,
+ it's not meant to be a reliable way to detect child/parent process, just a demo))
 */
 
 package main
