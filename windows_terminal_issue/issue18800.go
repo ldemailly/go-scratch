@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"golang.org/x/term"
 )
@@ -40,11 +41,14 @@ func main() {
 			RawPritnln("Error reading from terminal:", err)
 			return
 		}
-		if n == 1 && buf[0] == 'q' {
+		bufStr := string(buf[:n])
+		// might fail with some ansi echo having a q in them,
+		// but this is just a quick repro/test.
+		if strings.ContainsRune(bufStr, 'q') {
 			RawPritnln("\r\nExiting...")
 			break
 		}
-		fmt.Printf("\r[%05d]Read %d bytes: %q      ", iter, n, buf[:n])
+		fmt.Printf("\r[%05d]Read %d bytes: %q      ", iter, n, bufStr)
 		iter++
 	}
 }
