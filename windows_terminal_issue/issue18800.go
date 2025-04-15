@@ -48,7 +48,7 @@ func main() {
 			RawPritnln("\r\nExiting...")
 			break
 		}
-		fmt.Printf("\r[%05d]Read %d bytes: %q      ", iter, n, bufStr)
+		fmt.Printf("\r[%05d] Read %d bytes: %q      ", iter, n, bufStr)
 		iter++
 	}
 }
