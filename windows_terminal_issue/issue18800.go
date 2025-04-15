@@ -10,7 +10,7 @@ import (
 	"golang.org/x/term"
 )
 
-func RawPritnln(stuff ...any) {
+func RawPrintln(stuff ...any) {
 	fmt.Print(stuff...)
 	fmt.Print("\r\n")
 }
@@ -26,26 +26,30 @@ func main() {
 		err = term.Restore(fd, oldState)
 		fmt.Println("Terminal restored to original , err", err)
 	}()
-	RawPritnln("Terminal in raw mode - 'q' to exit")
+	RawPrintln("Terminal in raw mode - 'q' to exit")
 	buf := make([]byte, 16) // fits ansi arrow escape, unicode, etc
 	iter := 1
+	requestCursorPos := []byte("\033[6n")
+	expected := len(requestCursorPos)
 	for {
-		requestCursorPosStr := "\033[6n"
-		_, err = os.Stdout.Write([]byte(requestCursorPosStr))
+		nw, err := os.Stdout.Write([]byte(requestCursorPos))
 		if err != nil {
-			RawPritnln("Error writing to terminal:", err)
+			RawPrintln("Error writing to terminal:", err)
 			return
+		}
+		if nw != expected {
+			RawPrintln("Short write", nw, "vs", expected)
 		}
 		n, err := os.Stdin.Read(buf)
 		if err != nil {
-			RawPritnln("Error reading from terminal:", err)
+			RawPrintln("Error reading from terminal:", err)
 			return
 		}
 		bufStr := string(buf[:n])
 		// might fail with some ansi echo having a q in them,
 		// but this is just a quick repro/test.
 		if strings.ContainsRune(bufStr, 'q') {
-			RawPritnln("\r\nExiting...")
+			RawPrintln("\r\nExiting...")
 			break
 		}
 		fmt.Printf("\r[%05d] Read %d bytes: %q      ", iter, n, bufStr)
