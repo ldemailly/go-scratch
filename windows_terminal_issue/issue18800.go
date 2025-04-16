@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -16,6 +17,9 @@ func RawPrintln(stuff ...any) {
 }
 
 func main() {
+	numIter := 100_000
+	flag.IntVar(&numIter, "n", numIter, "number of `iterations`")
+	flag.Parse()
 	fd := int(os.Stdin.Fd())
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
@@ -26,13 +30,13 @@ func main() {
 		err = term.Restore(fd, oldState)
 		fmt.Println("Terminal restored to original , err", err)
 	}()
-	RawPrintln("Terminal in raw mode - 'q' to exit")
+	RawPrintln("Terminal in raw mode - 'q' to exit early")
+	RawPrintln("it should end on its own otherwise after ", numIter)
 	buf := make([]byte, 16) // fits ansi arrow escape, unicode, etc
-	iter := 1
 	requestCursorPos := []byte("\033[6n")
 	expected := len(requestCursorPos)
-	for {
-		nw, err := os.Stdout.Write([]byte(requestCursorPos))
+	for iter := range numIter {
+		nw, err := os.Stdout.Write(requestCursorPos)
 		if err != nil {
 			RawPrintln("Error writing to terminal:", err)
 			return
@@ -49,10 +53,9 @@ func main() {
 		// might fail with some ansi echo having a q in them,
 		// but this is just a quick repro/test.
 		if strings.ContainsRune(bufStr, 'q') {
-			RawPrintln("\r\nExiting...")
 			break
 		}
 		fmt.Printf("\r[%05d] Read %d bytes: %q      ", iter, n, bufStr)
-		iter++
 	}
+	RawPrintln("\r\nDone")
 }
