@@ -8,7 +8,49 @@ import (
 	"os/signal"
 )
 
+func getIF() (*net.Interface, *net.IP) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		panic(err)
+	}
+
+	for _, iface := range ifaces {
+		// Skip down or loopback interfaces
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+
+			ip = ip.To4()
+			if ip == nil {
+				continue // Skip non-IPv4
+			}
+
+			fmt.Printf("Using interface: %s (%s)\n", iface.Name, ip)
+			return &iface, &ip
+		}
+	}
+	return nil, nil
+}
+
 func main() {
+	iface, localIP := getIF()
 	a, err := net.ResolveUDPAddr("udp4", "239.0.10.10:3000")
 	if err != nil {
 		slog.Error(err.Error())
@@ -19,12 +61,16 @@ func main() {
 		slog.Error(err.Error())
 		return
 	}
-	l, err := net.ListenMulticastUDP("udp4", nil, a)
+	l, err := net.ListenMulticastUDP("udp4", iface, a)
 	if err != nil {
 		slog.Error(err.Error())
 		return
 	}
-	c, err := net.DialUDP("udp4", nil, d)
+	localAddr := &net.UDPAddr{
+		IP:   *localIP,
+		Port: 0, // let OS choose a free port
+	}
+	c, err := net.DialUDP("udp4", localAddr, d)
 	if err != nil {
 		slog.Error(err.Error())
 		return
