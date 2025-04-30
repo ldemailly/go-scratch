@@ -27,7 +27,7 @@ func main() {
 		Path: pkexec,
 		Args: args,
 	}
-	log.Printf("Running %v", sub)
+	log.Printf("Running %v", sub.Args)
 	sub.Stdout = os.Stdout
 	sub.Stderr = os.Stderr
 	err := sub.Run()
