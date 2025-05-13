@@ -1,5 +1,4 @@
-// Experiment with the Tk(9) package - see if I can replicate
-// https://github.com/fortio/terminal#brick
+// demo of Tk9 (go tk) toplevel windows hiding/showing
 
 package main
 
