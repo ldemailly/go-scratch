@@ -8,6 +8,13 @@
   vs
     hyperfine --warmup 3 --runs 10  "./lognolock  -lock > /dev/null"
 
+  Profiling:
+
+  ./lognolock -n 16 -w 200_000 -cpuprofile nolock.pprof > /dev/null
+  ./lognolock -n 16 -w 200_000 -cpuprofile lock.pprof -lock > /dev/null
+
+  pprof -http :8001 -diff_base=nolock.pprof lock.pprof
+
   On macos m3 pro: with lock is ~150ms and faster than without lock ~200ms. (!!)
 */
 
@@ -17,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/pprof"
 	"strconv"
 	"sync"
 )
@@ -28,7 +36,22 @@ func main() {
 	doLockFlag := flag.Bool("lock", false, "use a mutex to lock Write calls")
 	numRoutinesFlag := flag.Int("n", defaultGoRoutines, "number of goroutines to run")
 	numWritesFlag := flag.Int("w", defaultWrites, "number of writes per goroutine")
+	pprofFile := flag.String("cpuprofile", "", "write cpu profile to file")
 	flag.Parse()
+	if *pprofFile != "" {
+		f, err := os.Create(*pprofFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "could not create CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "Writing CPU profile to %s\n", *pprofFile)
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Fprintf(os.Stderr, "could not start CPU profile: %v\n", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
+	}
 	numWrites := *numWritesFlag
 	doLock := *doLockFlag
 	var l sync.Mutex
