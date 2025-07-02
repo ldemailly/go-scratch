@@ -21,22 +21,25 @@ import (
 	"sync"
 )
 
-const N = 20
-const M = 10000
+const defaultGoRoutines = 20
+const defaultWrites = 10000
 
 func main() {
 	doLockFlag := flag.Bool("lock", false, "use a mutex to lock Write calls")
+	numRoutinesFlag := flag.Int("n", defaultGoRoutines, "number of goroutines to run")
+	numWritesFlag := flag.Int("w", defaultWrites, "number of writes per goroutine")
 	flag.Parse()
+	numWrites := *numWritesFlag
 	doLock := *doLockFlag
 	var l sync.Mutex
 	var wg sync.WaitGroup
-	fmt.Fprintf(os.Stderr, "Running %d goroutines with %d Write in each; Using lock: %t\n", N, M, doLock)
-	for i := 0; i < N; i++ {
+	fmt.Fprintf(os.Stderr, "Running %d goroutines with %d Write in each; Using lock: %t\n", *numRoutinesFlag, numWrites, doLock)
+	for i := 0; i < *numRoutinesFlag; i++ {
 		wg.Add(1)
 		go func(id int) {
 			// Write a unique line using a single Write call
 			msg := "Goroutine " + strconv.Itoa(id) + "\n"
-			for range M {
+			for range numWrites {
 				if doLock {
 					l.Lock()
 				}
