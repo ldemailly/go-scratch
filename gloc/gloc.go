@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"io"
 	"os"
 	"strings"
 
@@ -29,7 +30,7 @@ func main() {
 	// Create a new file set for AST parsing
 	fset := token.NewFileSet()
 	for _, filename := range flag.Args() {
-		lines, err := countEffectiveLinesOfCode(debug, filename, fset)
+		lines, err := countEffectiveLinesOfCode(os.Stderr, debug, filename, fset)
 		if err != nil {
 			log.Errf("Error processing %s: %v", filename, err)
 			errCount++
@@ -45,14 +46,15 @@ func main() {
 	}
 }
 
-func countEffectiveLinesOfCode(debug bool, filename string, fset *token.FileSet) (int, error) {
+func countEffectiveLinesOfCode(out io.Writer, debug bool, filename string, fset *token.FileSet) (int, error) {
 	// Parse the file without parser.ParseComments to skip comments
 	file, err := parser.ParseFile(fset, filename, nil, parser.SkipObjectResolution)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse file: %w", err)
 	}
 	var buf bytes.Buffer
-	// Recover initial line count from the file set.
+	// Recover initial line count from the file (initial comments will be skipped
+	// when we call Fprint below).
 	originalLines := fset.Position(file.Pos()).Line - 1
 	log.Debugf("Processing %s, original lines: %d", filename, originalLines)
 
@@ -69,7 +71,7 @@ func countEffectiveLinesOfCode(debug bool, filename string, fset *token.FileSet)
 		if strings.TrimSpace(line) != "" {
 			lines++
 			if debug {
-				fmt.Printf("Line %3d (%3d): \t%s\n", lines, originalLines, line)
+				fmt.Fprintf(out, "Line %3d (%3d): \t%s\n", lines, originalLines, line)
 			}
 		}
 	}
