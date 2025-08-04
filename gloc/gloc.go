@@ -19,6 +19,7 @@ import (
 
 func main() {
 	cli.MinArgs = 1
+	cli.MaxArgs = -1
 	cli.ArgsHelp = "*.go files to count effective lines of code"
 	debugFlag := flag.Bool("debug", false, "Enable debug lines output")
 	cli.Main()
