@@ -46,13 +46,13 @@ func main() {
 }
 
 func countEffectiveLinesOfCode(debug bool, filename string, fset *token.FileSet) (int, error) {
-	// Parse the file to get comments (we already read the content)
-	// without parser.ParseComments to skip comments
+	// Parse the file without parser.ParseComments to skip comments
 	file, err := parser.ParseFile(fset, filename, nil, parser.SkipObjectResolution)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse file: %w", err)
 	}
 	var buf bytes.Buffer
+	// Recover initial line count from the file set.
 	originalLines := fset.Position(file.Pos()).Line - 1
 	log.Debugf("Processing %s, original lines: %d", filename, originalLines)
 
