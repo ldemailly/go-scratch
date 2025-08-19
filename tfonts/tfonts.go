@@ -4,6 +4,7 @@ import (
 	"flag"
 	"image"
 	"image/color"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"fortio.org/log"
 	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
+	"fortio.org/terminal/ansipixels/tcolor"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/font/sfnt"
@@ -57,8 +59,9 @@ func Main() int {
 	if err != nil {
 		return log.FErrf("failed to walk font directory: %v", err)
 	}
-	textColor := color.RGBA{R: 50, G: 80, B: 245, A: 255}
 	for _, f := range fonts {
+		col := tcolor.HSLToRGB(rand.Float64(), 0.5, 0.5)
+		textColor := color.RGBA{R: col.R, G: col.G, B: col.B, A: 255}
 		b, err := os.ReadFile(f)
 		if err != nil {
 			log.Errf("error reading font %s: %v", f, err)
@@ -72,6 +75,7 @@ func Main() int {
 		} else {
 			log.Infof("Loaded font: %s", f)
 		}
+		var buf sfnt.Buffer
 		for i := range fc.NumFonts() {
 			face, err := fc.Font(i)
 			if err != nil {
@@ -79,7 +83,16 @@ func Main() int {
 				continue
 			}
 			if i > 0 {
-				break // only draw the first font in the collection
+				break // only draw the first font in the collection for now.
+			}
+			idx, err := face.GlyphIndex(&buf, 'j') // check if the font has basic glyphs
+			if err != nil {
+				log.Errf("failed to get glyph index for font %s / %d: %v", f, i, err)
+				continue
+			}
+			if idx == 0 {
+				log.Infof("Font %s / %d does not have glyph for 'j'", f, i)
+				continue
 			}
 			name, err := face.Name(nil, sfnt.NameIDFull)
 			if err != nil {
@@ -88,7 +101,7 @@ func Main() int {
 			}
 			log.Infof("Drawing font %d: %s\n%s", i, f, name)
 			offsetY := 6
-			offsetX := 2
+			offsetX := 3
 			ff, err := opentype.NewFace(face, &opentype.FaceOptions{Size: 36, DPI: 72, Hinting: font.HintingFull})
 			ap.OnResize = func() error {
 				img := image.NewRGBA(image.Rect(0, 0, ap.W, ap.H*2))
@@ -102,6 +115,7 @@ func Main() int {
 				d.Dot.X = fixed.I(offsetX)
 				d.Dot.Y = fixed.I(2*(ap.H-2) - offsetY)
 				d.DrawString("jumps over the lazy dog")
+				ap.StartSyncMode()
 				ap.ClearScreen()
 				ap.ShowScaledImage(img)
 				ap.WriteAtStr(0, 0, name)
