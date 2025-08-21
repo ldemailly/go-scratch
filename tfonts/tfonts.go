@@ -4,9 +4,12 @@ import (
 	"flag"
 	"image"
 	"image/color"
+	"image/draw"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 
 	"fortio.org/cli"
@@ -25,8 +28,52 @@ func main() {
 }
 
 func Main() int {
-	fontDirFlag := flag.String("fontdir", "/System/Library/Fonts", "Directory containing font files")
+	var defaultFontDir string
+	switch runtime.GOOS {
+	case "darwin":
+		defaultFontDir = "/System/Library/Fonts"
+	case "linux", "freebsd":
+		defaultFontDir = "/usr/share/fonts"
+	case "windows":
+		defaultFontDir = "C:\\Windows\\Fonts"
+	}
+	fixedSeed := flag.Int64("seed", 0, "set fixed seed, 0 is random one")
+	fontDirFlag := flag.String("fontdir", defaultFontDir, "Directory containing font files")
+	fontSizeFlag := flag.Float64("size", 36, "Font size in points")
+	singleColor := flag.String("color", "", "Single text color, if empty use random colors")
+	defaultTruecolor := ansipixels.DetectColorMode().TrueColor
+	trueColor := flag.Bool("truecolor", defaultTruecolor, "Use true color (24-bit) instead of 256 colors")
+	monoFlag := flag.Bool("mono", false, "Use monochrome (1-bit) color")
+	grayFlag := flag.Bool("gray", false, "Use grayscale")
+	cli.MaxArgs = -1
+	cli.ArgsHelp = "2 lines of words to use or default text"
 	cli.Main()
+	var line1, line2 string
+	switch flag.NArg() {
+	case 2:
+		line1 = flag.Arg(0)
+		line2 = flag.Arg(1)
+	case 1:
+		input, err := strconv.Unquote(`"` + flag.Arg(0) + `"`)
+		if err != nil {
+			return log.FErrf("failed to unquote input %q: %v", flag.Arg(0), err)
+		}
+		lines := strings.SplitN(input, "\n", 2)
+		line1 = lines[0]
+		line2 = ""
+		if len(lines) > 1 {
+			line2 = lines[1]
+		}
+	case 0:
+		line1 = "The quick brown fox"
+		line2 = "jumps over the lazy dog"
+	default:
+		allInput := strings.Join(flag.Args(), " ")
+		mid := len(allInput)/2 - 1
+		cutOff := strings.Index(allInput[mid:], " ")
+		line1 = allInput[:mid+cutOff]
+		line2 = allInput[mid+cutOff+1:]
+	}
 	ap := ansipixels.NewAnsiPixels(60)
 	err := ap.Open()
 	if err != nil {
@@ -36,7 +83,25 @@ func Main() int {
 		ap.MoveCursor(0, ap.H-1)
 		ap.Restore()
 	}()
+	ap.TrueColor = *trueColor
+	ap.Gray = *grayFlag
+	if *monoFlag {
+		ap.TrueColor = false
+		ap.Color256 = false
+		if *singleColor != "" {
+			c, err := tcolor.FromString(*singleColor)
+			if err != nil {
+				return log.FErrf("invalid color %q: %v", *singleColor, err)
+			}
+			t, v := c.Decode()
+			if t != tcolor.ColorTypeBasic {
+				return log.FErrf("For mono, use basic color, got %s", c.String())
+			}
+			ap.MonoColor = tcolor.BasicColor(v)
+		}
+	}
 	terminal.LoggerSetup(&terminal.CRLFWriter{Out: ap.Out})
+	ap.SyncBackgroundColor()
 	fdir := *fontDirFlag
 	// Walk the font directory - recursively find all fonts and add them to a slice
 	var fonts []string
@@ -59,9 +124,33 @@ func Main() int {
 	if err != nil {
 		return log.FErrf("failed to walk font directory: %v", err)
 	}
+	// Set fixed rand/v2 seed:
+	// make a reproducible generator with seed 42
+	var src rand.Source
+	if *fixedSeed > 0 {
+		src = rand.NewPCG(uint64(*fixedSeed), 0)
+	} else {
+		src = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
+	}
+	rnd := rand.New(src)
+	textColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	if !*monoFlag && *singleColor != "" {
+		c, err := tcolor.FromString(*singleColor)
+		if err != nil {
+			return log.FErrf("invalid color %q: %v", *singleColor, err)
+		}
+		t, v := c.Decode()
+		if t == tcolor.ColorTypeBasic || t == tcolor.ColorType256 {
+			return log.FErrf("Use HSL or RGB/Hex color, got %s", c.String())
+		}
+		rgb := tcolor.ToRGB(t, v)
+		textColor = color.RGBA{R: rgb.R, G: rgb.G, B: rgb.B, A: 255}
+	}
 	for _, f := range fonts {
-		col := tcolor.HSLToRGB(rand.Float64(), 0.5, 0.5)
-		textColor := color.RGBA{R: col.R, G: col.G, B: col.B, A: 255}
+		if !*monoFlag && *singleColor == "" {
+			col := tcolor.HSLToRGB(rnd.Float64(), 0.5, 0.6)
+			textColor = color.RGBA{R: col.R, G: col.G, B: col.B, A: 255}
+		}
 		b, err := os.ReadFile(f)
 		if err != nil {
 			log.Errf("error reading font %s: %v", f, err)
@@ -102,19 +191,28 @@ func Main() int {
 			log.Infof("Drawing font %d: %s\n%s", i, f, name)
 			offsetY := 6
 			offsetX := 3
-			ff, err := opentype.NewFace(face, &opentype.FaceOptions{Size: 36, DPI: 72, Hinting: font.HintingFull})
+			ff, err := opentype.NewFace(face, &opentype.FaceOptions{Size: *fontSizeFlag, DPI: 72, Hinting: font.HintingFull})
 			ap.OnResize = func() error {
 				img := image.NewRGBA(image.Rect(0, 0, ap.W, ap.H*2))
+				// fill img with bgcolor using uniform color
+				bgColor := color.RGBA{R: ap.Background.R, G: ap.Background.G, B: ap.Background.B, A: 255}
+				draw.Draw(img, img.Bounds(), image.NewUniform(bgColor), image.Point{}, draw.Src)
 				d := &font.Drawer{
 					Dst:  img,
 					Src:  image.NewUniform(textColor),
 					Face: ff,
 					Dot:  fixed.Point26_6{X: fixed.I(offsetX), Y: fixed.I(ap.H - offsetY)},
 				}
-				d.DrawString("The quick brown fox")
-				d.Dot.X = fixed.I(offsetX)
-				d.Dot.Y = fixed.I(2*(ap.H-2) - offsetY)
-				d.DrawString("jumps over the lazy dog")
+				if len(line2) == 0 { // draw line 1 on line 2, allows for taller
+					d.Dot.X = fixed.I(offsetX)
+					d.Dot.Y = fixed.I(2*(ap.H-2) - offsetY)
+				}
+				d.DrawString(line1)
+				if len(line2) != 0 {
+					d.Dot.X = fixed.I(offsetX)
+					d.Dot.Y = fixed.I(2*(ap.H-2) - offsetY)
+					d.DrawString(line2)
+				}
 				ap.StartSyncMode()
 				ap.ClearScreen()
 				ap.ShowScaledImage(img)

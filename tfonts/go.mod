@@ -5,7 +5,7 @@ go 1.24.6
 require (
 	fortio.org/cli v1.10.0
 	fortio.org/log v1.17.2
-	fortio.org/terminal v0.49.1
+	fortio.org/terminal v0.51.0
 	golang.org/x/image v0.30.0
 )
 
