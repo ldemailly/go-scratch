@@ -71,6 +71,7 @@ func main() {
 		Port: 0, // let OS choose a free port
 	}
 	c, err := net.DialUDP("udp4", localAddr, d)
+	c.SetMulticastLoopback(false)
 	if err != nil {
 		slog.Error(err.Error())
 		return
