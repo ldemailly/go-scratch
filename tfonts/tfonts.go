@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -38,15 +40,17 @@ func Main() int {
 		defaultFontDir = "C:\\Windows\\Fonts"
 	}
 	fixedSeed := flag.Int64("seed", 0, "set fixed seed, 0 is random one")
-	fontDirFlag := flag.String("fontdir", defaultFontDir, "Directory containing font files")
-	fontSizeFlag := flag.Float64("size", 36, "Font size in points")
+	fontDirFlag := flag.String("fontdir", defaultFontDir, "Directory `path` containing font files")
+	fontSizeFlag := flag.Float64("size", 36, "Font size in `points`")
 	singleColor := flag.String("color", "", "Single text color, if empty use random colors")
 	defaultTruecolor := ansipixels.DetectColorMode().TrueColor
 	trueColor := flag.Bool("truecolor", defaultTruecolor, "Use true color (24-bit) instead of 256 colors")
 	monoFlag := flag.Bool("mono", false, "Use monochrome (1-bit) color")
 	grayFlag := flag.Bool("gray", false, "Use grayscale")
-	runeFlag := flag.String("rune", "", "Rune to check for in fonts (default: first rune of first line)")
+	runeFlag := flag.String("rune", "", "Rune to check for in fonts (default: first `rune` of first line)")
 	autoPlayFlag := flag.Duration("autoplay", 0, "If > 0, automatically advance to next font after this duration (e.g. 2s, 500ms)")
+	fontFlag := flag.String("font", "", "Font `path` to use instead of showing all the fonts in fontdir")
+	allVariantsFlag := flag.Bool("all", false, "Show all font variants (default is only the first found per file)")
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "2 lines of words to use or default text"
 	cli.Main()
@@ -121,24 +125,28 @@ func Main() int {
 	fdir := *fontDirFlag
 	// Walk the font directory - recursively find all fonts and add them to a slice
 	var fonts []string
-	err = filepath.WalkDir(fdir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			log.Errf("error accessing %s: %v", path, err)
-			return err
-		}
-		if d.IsDir() {
+	if *fontFlag != "" {
+		fonts = append(fonts, *fontFlag)
+	} else {
+		err = filepath.WalkDir(fdir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				log.Errf("error accessing %s: %v", path, err)
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			// check for ttf or ttc suffixes
+			ext := strings.ToLower(filepath.Ext(path))
+			if ext == ".ttf" || ext == ".ttc" {
+				fonts = append(fonts, path)
+			}
 			return nil
+		})
+		log.Infof("Found %d fonts", len(fonts))
+		if err != nil {
+			return log.FErrf("failed to walk font directory: %v", err)
 		}
-		// check for ttf or ttc suffixes
-		ext := strings.ToLower(filepath.Ext(path))
-		if ext == ".ttf" || ext == ".ttc" {
-			fonts = append(fonts, path)
-		}
-		return nil
-	})
-	log.Infof("Found %d fonts", len(fonts))
-	if err != nil {
-		return log.FErrf("failed to walk font directory: %v", err)
 	}
 	// Set fixed rand/v2 seed:
 	// make a reproducible generator with seed 42
@@ -163,14 +171,17 @@ func Main() int {
 		rgb := tcolor.ToRGB(t, v)
 		textColor = color.RGBA{R: rgb.R, G: rgb.G, B: rgb.B, A: 255}
 	}
-	for _, f := range fonts {
+	fidx := 0
+	for fidx < len(fonts) {
 		if !*monoFlag && *singleColor == "" {
 			col := tcolor.HSLToRGB(rnd.Float64(), 0.5, 0.6)
 			textColor = color.RGBA{R: col.R, G: col.G, B: col.B, A: 255}
 		}
+		f := fonts[fidx]
 		b, err := os.ReadFile(f)
 		if err != nil {
 			log.Errf("error reading font %s: %v", f, err)
+			fonts = slices.Delete(fonts, fidx, fidx+1)
 			continue
 		}
 		log.LogVf("Processing font file: %q", f)
@@ -178,32 +189,45 @@ func Main() int {
 		fc, err := opentype.ParseCollection(b)
 		if err != nil {
 			log.Errf("failed to parse font %s: %v", f, err)
+			fonts = slices.Delete(fonts, fidx, fidx+1)
+			continue
 		} else {
 			log.LogVf("Loaded font: %s", f)
 		}
 		var buf sfnt.Buffer
-		for i := range fc.NumFonts() {
+		numSubFonts := fc.NumFonts()
+		i := 0
+		for i < numSubFonts {
+			// TODO refactor the error cases instead of copy pasta
 			face, err := fc.Font(i)
+			i++
 			if err != nil {
 				log.Errf("failed to get sub font %s / %d: %v", f, i, err)
-				continue
+				fonts = slices.Delete(fonts, fidx, fidx+1)
+				fidx--
+				break
 			}
-			if i > 0 {
+			if !*allVariantsFlag && i > 0 {
 				break // only draw the first font in the collection for now.
 			}
 			idx, err := face.GlyphIndex(&buf, runeToCheck) // check if the font has basic glyphs
 			if err != nil {
 				log.Errf("failed to get glyph index for font %s / %d: %v", f, i, err)
-				continue
+				fonts = slices.Delete(fonts, fidx, fidx+1)
+				fidx--
+				break
 			}
 			if idx == 0 {
 				log.Infof("Font %s / %d does not have glyph for '%c'", f, i, runeToCheck)
-				continue
+				fonts = slices.Delete(fonts, fidx, fidx+1)
+				fidx--
+				break
 			}
 			name, err := face.Name(nil, sfnt.NameIDFull)
 			if err != nil {
 				log.Errf("failed to get name for font %s / %d: %v", f, i, err)
-				continue
+				fidx--
+				break
 			}
 			log.LogVf("Drawing font %d: %s\n%s", i, f, name)
 			offsetY := 6
@@ -233,7 +257,11 @@ func Main() int {
 				ap.StartSyncMode()
 				ap.ClearScreen()
 				ap.ShowScaledImage(img)
-				ap.WriteAtStr(0, 0, name+extra)
+				subfontInfo := ""
+				if numSubFonts > 1 {
+					subfontInfo = fmt.Sprintf("(subfont %d/%d) ", i, numSubFonts)
+				}
+				ap.WriteAt(0, 0, "%d/%d %s%s%s", fidx+1, len(fonts), subfontInfo, name, extra)
 				return nil
 			}
 			ap.OnResize()
@@ -243,11 +271,27 @@ func Main() int {
 			} else {
 				ap.ReadOrResizeOrSignal()
 			}
-			if len(ap.Data) > 0 && (ap.Data[0] == 'q' || ap.Data[0] == 3) {
-				log.Infof("Exiting on user request")
+			if len(ap.Data) == 0 {
+				continue
+			}
+			c := ap.Data[0]
+			switch c {
+			case 'q', 'Q', 3:
+				ap.MoveCursor(0, 1)
+				log.Infof("Exiting on user request, last font file %s", f)
 				return 0
+			case 127:
+				fidx -= 2       // go back one (will be incremented at end of loop)
+				i = numSubFonts // poor man's break
+			case 27:
+				// left arrow
+				if len(ap.Data) >= 3 && ap.Data[2] == 'D' {
+					fidx -= 2       // go back one (will be incremented at end of loop)
+					i = numSubFonts // poor man's break
+				}
 			}
 		}
+		fidx = max(fidx+1, 0)
 	}
 	if autoPlay > 0 {
 		// one last key at the end before exiting
