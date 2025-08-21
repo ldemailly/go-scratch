@@ -200,7 +200,6 @@ func Main() int {
 		for i < numSubFonts {
 			// TODO refactor the error cases instead of copy pasta
 			face, err := fc.Font(i)
-			i++
 			if err != nil {
 				log.Errf("failed to get sub font %s / %d: %v", f, i, err)
 				fonts = slices.Delete(fonts, fidx, fidx+1)
@@ -210,6 +209,7 @@ func Main() int {
 			if !*allVariantsFlag && i > 0 {
 				break // only draw the first font in the collection for now.
 			}
+			i++
 			idx, err := face.GlyphIndex(&buf, runeToCheck) // check if the font has basic glyphs
 			if err != nil {
 				log.Errf("failed to get glyph index for font %s / %d: %v", f, i, err)
