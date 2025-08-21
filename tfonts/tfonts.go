@@ -45,10 +45,14 @@ func Main() int {
 	trueColor := flag.Bool("truecolor", defaultTruecolor, "Use true color (24-bit) instead of 256 colors")
 	monoFlag := flag.Bool("mono", false, "Use monochrome (1-bit) color")
 	grayFlag := flag.Bool("gray", false, "Use grayscale")
+	runeFlag := flag.String("rune", "", "Rune to check for in fonts (default: first rune of first line)")
+	autoPlayFlag := flag.Duration("autoplay", 0, "If > 0, automatically advance to next font after this duration (e.g. 2s, 500ms)")
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "2 lines of words to use or default text"
 	cli.Main()
+	autoPlay := *autoPlayFlag
 	var line1, line2 string
+	var runeToCheck rune = 0
 	switch flag.NArg() {
 	case 2:
 		line1 = flag.Arg(0)
@@ -67,6 +71,7 @@ func Main() int {
 	case 0:
 		line1 = "The quick brown fox"
 		line2 = "jumps over the lazy dog"
+		runeToCheck = 'j' // not T as some symbol fonts have T but not j
 	default:
 		allInput := strings.Join(flag.Args(), " ")
 		mid := len(allInput)/2 - 1
@@ -74,7 +79,18 @@ func Main() int {
 		line1 = allInput[:mid+cutOff]
 		line2 = allInput[mid+cutOff+1:]
 	}
-	ap := ansipixels.NewAnsiPixels(60)
+	if runeToCheck == 0 {
+		// use the first rune of line 1
+		runeToCheck = []rune(line1)[0]
+	}
+	if *runeFlag != "" {
+		runeToCheck = []rune(*runeFlag)[0]
+	}
+	fps := 60.
+	if autoPlay > 0 {
+		fps = 1 / autoPlay.Seconds()
+	}
+	ap := ansipixels.NewAnsiPixels(fps)
 	err := ap.Open()
 	if err != nil {
 		return log.FErrf("failed to open ansi pixels: %v", err)
@@ -134,6 +150,7 @@ func Main() int {
 	}
 	rnd := rand.New(src)
 	textColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	extra := " " // one space after the cursor
 	if !*monoFlag && *singleColor != "" {
 		c, err := tcolor.FromString(*singleColor)
 		if err != nil {
@@ -156,13 +173,13 @@ func Main() int {
 			log.Errf("error reading font %s: %v", f, err)
 			continue
 		}
-		log.Infof("Processing font file: %q", f)
+		log.LogVf("Processing font file: %q", f)
 		// Draw the font onto the image
 		fc, err := opentype.ParseCollection(b)
 		if err != nil {
 			log.Errf("failed to parse font %s: %v", f, err)
 		} else {
-			log.Infof("Loaded font: %s", f)
+			log.LogVf("Loaded font: %s", f)
 		}
 		var buf sfnt.Buffer
 		for i := range fc.NumFonts() {
@@ -174,13 +191,13 @@ func Main() int {
 			if i > 0 {
 				break // only draw the first font in the collection for now.
 			}
-			idx, err := face.GlyphIndex(&buf, 'j') // check if the font has basic glyphs
+			idx, err := face.GlyphIndex(&buf, runeToCheck) // check if the font has basic glyphs
 			if err != nil {
 				log.Errf("failed to get glyph index for font %s / %d: %v", f, i, err)
 				continue
 			}
 			if idx == 0 {
-				log.Infof("Font %s / %d does not have glyph for 'j'", f, i)
+				log.Infof("Font %s / %d does not have glyph for '%c'", f, i, runeToCheck)
 				continue
 			}
 			name, err := face.Name(nil, sfnt.NameIDFull)
@@ -188,7 +205,7 @@ func Main() int {
 				log.Errf("failed to get name for font %s / %d: %v", f, i, err)
 				continue
 			}
-			log.Infof("Drawing font %d: %s\n%s", i, f, name)
+			log.LogVf("Drawing font %d: %s\n%s", i, f, name)
 			offsetY := 6
 			offsetX := 3
 			ff, err := opentype.NewFace(face, &opentype.FaceOptions{Size: *fontSizeFlag, DPI: 72, Hinting: font.HintingFull})
@@ -216,16 +233,27 @@ func Main() int {
 				ap.StartSyncMode()
 				ap.ClearScreen()
 				ap.ShowScaledImage(img)
-				ap.WriteAtStr(0, 0, name)
+				ap.WriteAtStr(0, 0, name+extra)
 				return nil
 			}
 			ap.OnResize()
-			ap.ReadOrResizeOrSignal()
-			if len(ap.Data) > 0 && ap.Data[0] == 'q' {
+			if autoPlay > 0 {
+				ap.EndSyncMode()
+				ap.ReadOrResizeOrSignalOnce()
+			} else {
+				ap.ReadOrResizeOrSignal()
+			}
+			if len(ap.Data) > 0 && (ap.Data[0] == 'q' || ap.Data[0] == 3) {
 				log.Infof("Exiting on user request")
 				return 0
 			}
 		}
+	}
+	if autoPlay > 0 {
+		// one last key at the end before exiting
+		extra = " (last font, any key to exit)..."
+		ap.OnResize()
+		ap.ReadOrResizeOrSignal()
 	}
 	return 0
 }
