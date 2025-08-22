@@ -311,23 +311,22 @@ var NoGlyphErr = fmt.Errorf("no glyph for rune")
 func (fs *FState) ProcessSubFont(fc *opentype.Collection, i, numSubFonts int) error {
 	var buf sfnt.Buffer
 	extra := " "
-	face, err := fc.Font(i)
+	face, err := fc.Font(i) // 0 indexed here, we use i+1 for user messages/logs below.
 	if err != nil {
 		return err
 	}
-	i++
 	idx, err := face.GlyphIndex(&buf, fs.RuneToCheck) // check if the font has basic glyphs
 	if err != nil {
 		return err
 	}
 	if idx == 0 {
-		return fmt.Errorf("%w %c in font %s / %d", NoGlyphErr, fs.RuneToCheck, fs.fonts[fs.fidx], i)
+		return fmt.Errorf("%w %c in font %s / %d", NoGlyphErr, fs.RuneToCheck, fs.fonts[fs.fidx], i+1)
 	}
 	name, err := face.Name(nil, sfnt.NameIDFull)
 	if err != nil {
 		return err
 	}
-	log.LogVf("Drawing font %d: %s\n%s", i, fs.fonts[fs.fidx], name)
+	log.LogVf("Drawing font %d: %s\n%s", i+1, fs.fonts[fs.fidx], name)
 	offsetY := 6
 	offsetX := 3
 	ff, err := opentype.NewFace(face, &opentype.FaceOptions{Size: fs.FontSize, DPI: 72, Hinting: font.HintingFull})
@@ -357,7 +356,7 @@ func (fs *FState) ProcessSubFont(fc *opentype.Collection, i, numSubFonts int) er
 		fs.ap.ShowScaledImage(img)
 		subfontInfo := ""
 		if numSubFonts > 1 {
-			subfontInfo = fmt.Sprintf("(subfont %d/%d) ", i, numSubFonts)
+			subfontInfo = fmt.Sprintf("(subfont %d/%d) ", i+1, numSubFonts)
 		}
 		fs.ap.WriteAt(0, 0, "%d/%d %s%s%s", fs.fidx+1, len(fs.fonts), subfontInfo, name, extra)
 		return nil
