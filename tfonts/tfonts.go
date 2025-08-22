@@ -306,11 +306,10 @@ func (fs *FState) ProcessOneFile() error {
 	return nil
 }
 
-var NoGlyphErr = fmt.Errorf("no glyph for rune")
+var NoGlyphErr = errors.New("no glyph for rune")
 
 func (fs *FState) ProcessSubFont(fc *opentype.Collection, i, numSubFonts int) error {
 	var buf sfnt.Buffer
-	extra := " "
 	face, err := fc.Font(i) // 0 indexed here, we use i+1 for user messages/logs below.
 	if err != nil {
 		return err
@@ -358,7 +357,7 @@ func (fs *FState) ProcessSubFont(fc *opentype.Collection, i, numSubFonts int) er
 		if numSubFonts > 1 {
 			subfontInfo = fmt.Sprintf("(subfont %d/%d) ", i+1, numSubFonts)
 		}
-		fs.ap.WriteAt(0, 0, "%d/%d %s%s%s", fs.fidx+1, len(fs.fonts), subfontInfo, name, extra)
+		fs.ap.WriteAt(0, 0, "%d/%d %s%s ", fs.fidx+1, len(fs.fonts), subfontInfo, name)
 		return nil
 	}
 	fs.total++
