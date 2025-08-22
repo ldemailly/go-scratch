@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"image"
@@ -13,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"fortio.org/cli"
 	"fortio.org/log"
@@ -27,6 +29,30 @@ import (
 
 func main() {
 	os.Exit(Main())
+}
+
+type FState struct {
+	// Input
+	FontFile    string
+	FontDir     string
+	FontSize    float64
+	Line1       string
+	Line2       string
+	RuneToCheck rune
+	AutoPlay    time.Duration
+	AllVariants bool
+	FixedSeed   int64
+	Monochrome  bool
+	SingleColor string
+	// Internal
+	rnd       *rand.Rand
+	ap        *ansipixels.AnsiPixels
+	fonts     []string
+	fidx      int
+	textColor color.RGBA
+	done      bool
+	goBack    bool
+	total     int
 }
 
 func Main() int {
@@ -54,60 +80,38 @@ func Main() int {
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "2 lines of words to use or default text"
 	cli.Main()
-	autoPlay := *autoPlayFlag
-	var line1, line2 string
-	var runeToCheck rune = 0
-	switch flag.NArg() {
-	case 2:
-		line1 = flag.Arg(0)
-		line2 = flag.Arg(1)
-	case 1:
-		input, err := strconv.Unquote(`"` + flag.Arg(0) + `"`)
-		if err != nil {
-			return log.FErrf("failed to unquote input %q: %v", flag.Arg(0), err)
-		}
-		lines := strings.SplitN(input, "\n", 2)
-		line1 = lines[0]
-		line2 = ""
-		if len(lines) > 1 {
-			line2 = lines[1]
-		}
-	case 0:
-		line1 = "The quick brown fox"
-		line2 = "jumps over the lazy dog"
-		runeToCheck = 'j' // not T as some symbol fonts have T but not j
-	default:
-		allInput := strings.Join(flag.Args(), " ")
-		mid := len(allInput)/2 - 1
-		cutOff := strings.Index(allInput[mid:], " ")
-		line1 = allInput[:mid+cutOff]
-		line2 = allInput[mid+cutOff+1:]
+	fs := FState{
+		FontFile:    *fontFlag,
+		FontDir:     *fontDirFlag,
+		FontSize:    *fontSizeFlag,
+		AutoPlay:    *autoPlayFlag,
+		AllVariants: *allVariantsFlag,
+		FixedSeed:   *fixedSeed,
+		Monochrome:  *monoFlag,
+		SingleColor: *singleColor,
 	}
-	if runeToCheck == 0 {
-		// use the first rune of line 1
-		runeToCheck = []rune(line1)[0]
-	}
-	if *runeFlag != "" {
-		runeToCheck = []rune(*runeFlag)[0]
+	err := fs.LinesAndRune(*runeFlag)
+	if err != nil {
+		return log.FErrf("failed to get lines and rune: %v", err)
 	}
 	fps := 60.
-	if autoPlay > 0 {
-		fps = 1 / autoPlay.Seconds()
+	if fs.AutoPlay > 0 {
+		fps = 1 / fs.AutoPlay.Seconds()
 	}
-	ap := ansipixels.NewAnsiPixels(fps)
-	err := ap.Open()
+	fs.ap = ansipixels.NewAnsiPixels(fps)
+	err = fs.ap.Open()
 	if err != nil {
 		return log.FErrf("failed to open ansi pixels: %v", err)
 	}
 	defer func() {
-		ap.MoveCursor(0, ap.H-1)
-		ap.Restore()
+		fs.ap.MoveCursor(0, fs.ap.H-1)
+		fs.ap.Restore()
 	}()
-	ap.TrueColor = *trueColor
-	ap.Gray = *grayFlag
+	fs.ap.TrueColor = *trueColor
+	fs.ap.Gray = *grayFlag
 	if *monoFlag {
-		ap.TrueColor = false
-		ap.Color256 = false
+		fs.ap.TrueColor = false
+		fs.ap.Color256 = false
 		if *singleColor != "" {
 			c, err := tcolor.FromString(*singleColor)
 			if err != nil {
@@ -117,187 +121,252 @@ func Main() int {
 			if t != tcolor.ColorTypeBasic {
 				return log.FErrf("For mono, use basic color, got %s", c.String())
 			}
-			ap.MonoColor = tcolor.BasicColor(v)
+			fs.ap.MonoColor = tcolor.BasicColor(v)
 		}
 	}
-	terminal.LoggerSetup(&terminal.CRLFWriter{Out: ap.Out})
-	ap.SyncBackgroundColor()
-	fdir := *fontDirFlag
-	// Walk the font directory - recursively find all fonts and add them to a slice
-	var fonts []string
-	if *fontFlag != "" {
-		fonts = append(fonts, *fontFlag)
-	} else {
-		err = filepath.WalkDir(fdir, func(path string, d os.DirEntry, err error) error {
-			if err != nil {
-				log.Errf("error accessing %s: %v", path, err)
-				return err
-			}
-			if d.IsDir() {
-				return nil
-			}
-			// check for ttf or ttc suffixes
-			ext := strings.ToLower(filepath.Ext(path))
-			if ext == ".ttf" || ext == ".ttc" {
-				fonts = append(fonts, path)
-			}
-			return nil
-		})
-		log.Infof("Found %d fonts", len(fonts))
+	terminal.LoggerSetup(&terminal.CRLFWriter{Out: fs.ap.Out})
+	fs.ap.SyncBackgroundColor()
+	if err = fs.FontsList(); err != nil {
+		return log.FErrf("failed to list fonts: %v", err)
+	}
+	log.Infof("Found %d fonts", len(fs.fonts))
+	if err = fs.ColorSetup(); err != nil {
+		return log.FErrf("failed to set up color(s): %v", err)
+	}
+	return fs.RunFonts()
+}
+
+func (fs *FState) LinesAndRune(runeFlag string) error {
+	switch flag.NArg() {
+	case 2:
+		fs.Line1 = flag.Arg(0)
+		fs.Line2 = flag.Arg(1)
+	case 1:
+		input, err := strconv.Unquote(`"` + flag.Arg(0) + `"`)
 		if err != nil {
-			return log.FErrf("failed to walk font directory: %v", err)
+			return fmt.Errorf("failed to unquote input %q: %w", flag.Arg(0), err)
 		}
+		lines := strings.SplitN(input, "\n", 2)
+		fs.Line1 = lines[0]
+		fs.Line2 = ""
+		if len(lines) > 1 {
+			fs.Line2 = lines[1]
+		}
+	case 0:
+		fs.Line1 = "The quick brown fox"
+		fs.Line2 = "jumps over the lazy dog"
+		fs.RuneToCheck = 'j' // not T as some symbol fonts have T but not j
+	default:
+		allInput := strings.Join(flag.Args(), " ")
+		mid := len(allInput)/2 - 1
+		cutOff := strings.Index(allInput[mid:], " ")
+		fs.Line1 = allInput[:mid+cutOff]
+		fs.Line2 = allInput[mid+cutOff+1:]
 	}
+	if fs.RuneToCheck == 0 {
+		// use the first rune of line 1
+		fs.RuneToCheck = []rune(fs.Line1)[0]
+	}
+	if runeFlag != "" {
+		fs.RuneToCheck = []rune(runeFlag)[0]
+	}
+	return nil
+}
+
+func (fs *FState) FontsList() error {
+	// Walk the font directory - recursively find all fonts and add them to a slice
+	if fs.FontFile != "" {
+		fs.fonts = append(fs.fonts, fs.FontFile)
+		return nil
+	}
+	return filepath.WalkDir(fs.FontDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			log.Errf("error accessing %s: %v", path, err)
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		// check for ttf or ttc suffixes
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext == ".ttf" || ext == ".ttc" {
+			fs.fonts = append(fs.fonts, path)
+		}
+		return nil
+	})
+}
+
+func (fs *FState) ColorSetup() error {
 	// Set fixed rand/v2 seed:
 	// make a reproducible generator with seed 42
 	var src rand.Source
-	if *fixedSeed > 0 {
-		src = rand.NewPCG(uint64(*fixedSeed), 0)
+	if fs.FixedSeed > 0 {
+		src = rand.NewPCG(uint64(fs.FixedSeed), 0)
 	} else {
 		src = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
 	}
-	rnd := rand.New(src)
-	textColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	extra := " " // one space after the cursor
-	if !*monoFlag && *singleColor != "" {
-		c, err := tcolor.FromString(*singleColor)
+	fs.rnd = rand.New(src)
+	fs.textColor = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	if !fs.Monochrome && fs.SingleColor != "" {
+		c, err := tcolor.FromString(fs.SingleColor)
 		if err != nil {
-			return log.FErrf("invalid color %q: %v", *singleColor, err)
+			return fmt.Errorf("invalid color %q: %w", fs.SingleColor, err)
 		}
 		t, v := c.Decode()
 		if t == tcolor.ColorTypeBasic || t == tcolor.ColorType256 {
-			return log.FErrf("Use HSL or RGB/Hex color, got %s", c.String())
+			return fmt.Errorf("use HSL or RGB/Hex color, got %s", c.String())
 		}
 		rgb := tcolor.ToRGB(t, v)
-		textColor = color.RGBA{R: rgb.R, G: rgb.G, B: rgb.B, A: 255}
+		fs.textColor = color.RGBA{R: rgb.R, G: rgb.G, B: rgb.B, A: 255}
 	}
-	fidx := 0
-	for fidx < len(fonts) {
-		if !*monoFlag && *singleColor == "" {
-			col := tcolor.HSLToRGB(rnd.Float64(), 0.5, 0.6)
-			textColor = color.RGBA{R: col.R, G: col.G, B: col.B, A: 255}
+	return nil
+}
+
+func (fs *FState) ErrorDeleteEntry(err error, fmt string, args ...any) {
+	if errors.Is(err, NoGlyphErr) {
+		log.Infof(fmt, args...)
+	} else {
+		log.Errf(fmt, args...)
+	}
+	fs.fonts = slices.Delete(fs.fonts, fs.fidx, fs.fidx+1)
+}
+
+func (fs *FState) RunFonts() int {
+	for fs.fidx < len(fs.fonts) {
+		// optionally change color each time
+		if !fs.Monochrome && fs.SingleColor == "" {
+			col := tcolor.HSLToRGB(fs.rnd.Float64(), 0.5, 0.6)
+			fs.textColor = color.RGBA{R: col.R, G: col.G, B: col.B, A: 255}
 		}
-		f := fonts[fidx]
-		b, err := os.ReadFile(f)
-		if err != nil {
-			log.Errf("error reading font %s: %v", f, err)
-			fonts = slices.Delete(fonts, fidx, fidx+1)
+		// Do the work for 1 font
+		if err := fs.ProcessOneFile(); err != nil {
+			fs.ErrorDeleteEntry(err, "error processing font %s: %v", fs.fonts[fs.fidx], err)
 			continue
 		}
-		log.LogVf("Processing font file: %q", f)
-		// Draw the font onto the image
-		fc, err := opentype.ParseCollection(b)
-		if err != nil {
-			log.Errf("failed to parse font %s: %v", f, err)
-			fonts = slices.Delete(fonts, fidx, fidx+1)
-			continue
+		if fs.done {
+			return 0
+		}
+		if fs.goBack {
+			fs.fidx = max(fs.fidx-1, 0)
 		} else {
-			log.LogVf("Loaded font: %s", f)
+			fs.fidx++
 		}
-		var buf sfnt.Buffer
-		numSubFonts := fc.NumFonts()
-		i := 0
-		for i < numSubFonts {
-			// TODO refactor the error cases instead of copy pasta
-			face, err := fc.Font(i)
-			if err != nil {
-				log.Errf("failed to get sub font %s / %d: %v", f, i, err)
-				fonts = slices.Delete(fonts, fidx, fidx+1)
-				fidx--
-				break
-			}
-			if !*allVariantsFlag && i > 0 {
-				break // only draw the first font in the collection for now.
-			}
-			i++
-			idx, err := face.GlyphIndex(&buf, runeToCheck) // check if the font has basic glyphs
-			if err != nil {
-				log.Errf("failed to get glyph index for font %s / %d: %v", f, i, err)
-				fonts = slices.Delete(fonts, fidx, fidx+1)
-				fidx--
-				break
-			}
-			if idx == 0 {
-				log.Infof("Font %s / %d does not have glyph for '%c'", f, i, runeToCheck)
-				fonts = slices.Delete(fonts, fidx, fidx+1)
-				fidx--
-				break
-			}
-			name, err := face.Name(nil, sfnt.NameIDFull)
-			if err != nil {
-				log.Errf("failed to get name for font %s / %d: %v", f, i, err)
-				fidx--
-				break
-			}
-			log.LogVf("Drawing font %d: %s\n%s", i, f, name)
-			offsetY := 6
-			offsetX := 3
-			ff, err := opentype.NewFace(face, &opentype.FaceOptions{Size: *fontSizeFlag, DPI: 72, Hinting: font.HintingFull})
-			ap.OnResize = func() error {
-				img := image.NewRGBA(image.Rect(0, 0, ap.W, ap.H*2))
-				// fill img with bgcolor using uniform color
-				bgColor := color.RGBA{R: ap.Background.R, G: ap.Background.G, B: ap.Background.B, A: 255}
-				draw.Draw(img, img.Bounds(), image.NewUniform(bgColor), image.Point{}, draw.Src)
-				d := &font.Drawer{
-					Dst:  img,
-					Src:  image.NewUniform(textColor),
-					Face: ff,
-					Dot:  fixed.Point26_6{X: fixed.I(offsetX), Y: fixed.I(ap.H - offsetY)},
-				}
-				if len(line2) == 0 { // draw line 1 on line 2, allows for taller
-					d.Dot.X = fixed.I(offsetX)
-					d.Dot.Y = fixed.I(2*(ap.H-2) - offsetY)
-				}
-				d.DrawString(line1)
-				if len(line2) != 0 {
-					d.Dot.X = fixed.I(offsetX)
-					d.Dot.Y = fixed.I(2*(ap.H-2) - offsetY)
-					d.DrawString(line2)
-				}
-				ap.StartSyncMode()
-				ap.ClearScreen()
-				ap.ShowScaledImage(img)
-				subfontInfo := ""
-				if numSubFonts > 1 {
-					subfontInfo = fmt.Sprintf("(subfont %d/%d) ", i, numSubFonts)
-				}
-				ap.WriteAt(0, 0, "%d/%d %s%s%s", fidx+1, len(fonts), subfontInfo, name, extra)
+	}
+	fs.ap.MoveCursor(0, 1)
+	fs.ap.EndSyncMode()
+	log.Infof("Total fonts processed: %d", fs.total)
+	return 0
+}
+
+func (fs *FState) ProcessOneFile() error {
+	fs.goBack = false
+	f := fs.fonts[fs.fidx]
+	b, err := os.ReadFile(f)
+	if err != nil {
+		return err
+	}
+	log.LogVf("Processing font file: %q", f)
+	// Draw the font onto the image
+	fc, err := opentype.ParseCollection(b)
+	if err != nil {
+		return err
+	}
+	log.LogVf("Loaded font: %s", f)
+	numSubFonts := fc.NumFonts()
+	i := 0
+	for i < numSubFonts {
+		if err := fs.ProcessSubFont(fc, i, numSubFonts); err != nil {
+			return err
+		}
+		i++
+		if !fs.AllVariants {
+			i = numSubFonts // poor mans 'break after this one loop but process keys'
+		}
+		if len(fs.ap.Data) == 0 {
+			continue
+		}
+		c := fs.ap.Data[0]
+		switch c {
+		case 'q', 'Q', 3:
+			fs.ap.MoveCursor(0, 1)
+			log.Infof("Exiting on user request after %d %s. Last font file %s", fs.total, cli.Plural(fs.total, "font"), f)
+			fs.done = true
+			return nil
+		case 127:
+			fs.goBack = true
+			return nil
+		case 27:
+			// left arrow
+			if len(fs.ap.Data) >= 3 && fs.ap.Data[2] == 'D' {
+				fs.goBack = true
 				return nil
 			}
-			ap.OnResize()
-			if autoPlay > 0 {
-				ap.EndSyncMode()
-				ap.ReadOrResizeOrSignalOnce()
-			} else {
-				ap.ReadOrResizeOrSignal()
-			}
-			if len(ap.Data) == 0 {
-				continue
-			}
-			c := ap.Data[0]
-			switch c {
-			case 'q', 'Q', 3:
-				ap.MoveCursor(0, 1)
-				log.Infof("Exiting on user request, last font file %s", f)
-				return 0
-			case 127:
-				fidx -= 2       // go back one (will be incremented at end of loop)
-				i = numSubFonts // poor man's break
-			case 27:
-				// left arrow
-				if len(ap.Data) >= 3 && ap.Data[2] == 'D' {
-					fidx -= 2       // go back one (will be incremented at end of loop)
-					i = numSubFonts // poor man's break
-				}
-			}
 		}
-		fidx = max(fidx+1, 0)
 	}
-	if autoPlay > 0 {
-		// one last key at the end before exiting
-		extra = " (last font, any key to exit)..."
-		ap.OnResize()
-		ap.ReadOrResizeOrSignal()
+	return nil
+}
+
+var NoGlyphErr = errors.New("no glyph for rune")
+
+func (fs *FState) ProcessSubFont(fc *opentype.Collection, i, numSubFonts int) error {
+	var buf sfnt.Buffer
+	face, err := fc.Font(i) // 0 indexed here, we use i+1 for user messages/logs below.
+	if err != nil {
+		return err
 	}
-	return 0
+	idx, err := face.GlyphIndex(&buf, fs.RuneToCheck) // check if the font has basic glyphs
+	if err != nil {
+		return err
+	}
+	if idx == 0 {
+		return fmt.Errorf("%w %c in font %s / %d", NoGlyphErr, fs.RuneToCheck, fs.fonts[fs.fidx], i+1)
+	}
+	name, err := face.Name(nil, sfnt.NameIDFull)
+	if err != nil {
+		return err
+	}
+	log.LogVf("Drawing font %d: %s\n%s", i+1, fs.fonts[fs.fidx], name)
+	offsetY := 6
+	offsetX := 3
+	ff, err := opentype.NewFace(face, &opentype.FaceOptions{Size: fs.FontSize, DPI: 72, Hinting: font.HintingFull})
+	fs.ap.OnResize = func() error {
+		img := image.NewRGBA(image.Rect(0, 0, fs.ap.W, fs.ap.H*2))
+		// fill img with bgcolor using uniform color
+		bgColor := color.RGBA{R: fs.ap.Background.R, G: fs.ap.Background.G, B: fs.ap.Background.B, A: 255}
+		draw.Draw(img, img.Bounds(), image.NewUniform(bgColor), image.Point{}, draw.Src)
+		d := &font.Drawer{
+			Dst:  img,
+			Src:  image.NewUniform(fs.textColor),
+			Face: ff,
+			Dot:  fixed.Point26_6{X: fixed.I(offsetX), Y: fixed.I(fs.ap.H - offsetY)},
+		}
+		if len(fs.Line2) == 0 { // draw line 1 on line 2, allows for taller
+			d.Dot.X = fixed.I(offsetX)
+			d.Dot.Y = fixed.I(2*(fs.ap.H-2) - offsetY)
+		}
+		d.DrawString(fs.Line1)
+		if len(fs.Line2) != 0 {
+			d.Dot.X = fixed.I(offsetX)
+			d.Dot.Y = fixed.I(2*(fs.ap.H-2) - offsetY)
+			d.DrawString(fs.Line2)
+		}
+		fs.ap.StartSyncMode()
+		fs.ap.ClearScreen()
+		fs.ap.ShowScaledImage(img)
+		subfontInfo := ""
+		if numSubFonts > 1 {
+			subfontInfo = fmt.Sprintf("(subfont %d/%d) ", i+1, numSubFonts)
+		}
+		fs.ap.WriteAt(0, 0, "%d/%d %s%s ", fs.fidx+1, len(fs.fonts), subfontInfo, name)
+		return nil
+	}
+	fs.total++
+	fs.ap.OnResize()
+	if fs.AutoPlay > 0 {
+		fs.ap.EndSyncMode()
+		fs.ap.ReadOrResizeOrSignalOnce()
+	} else {
+		fs.ap.ReadOrResizeOrSignal()
+	}
+	return nil
 }
