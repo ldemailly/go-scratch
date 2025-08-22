@@ -77,9 +77,16 @@ func Main() int {
 	autoPlayFlag := flag.Duration("autoplay", 0, "If > 0, automatically advance to next font after this duration (e.g. 2s, 500ms)")
 	fontFlag := flag.String("font", "", "Font `path` to use instead of showing all the fonts in fontdir")
 	allVariantsFlag := flag.Bool("all", false, "Show all font variants (default is only the first found per file)")
+	oldFlag := flag.Bool("old", false, "Run anyway despite this being the stale non fortio.org version")
 	cli.MaxArgs = -1
 	cli.ArgsHelp = "2 lines of words to use or default text"
 	cli.Main()
+	if !*oldFlag {
+		fmt.Fprintf(os.Stderr, "\n⚠️ tfonts CLI has moved. Please install from:\n\n"+
+			"go install fortio.org/tfonts@latest\n\n"+
+			"Or visit https://github.com/fortio/tfonts#tfonts\n\n")
+		os.Exit(1)
+	}
 	fs := FState{
 		FontFile:    *fontFlag,
 		FontDir:     *fontDirFlag,

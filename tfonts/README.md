@@ -1,5 +1,8 @@
 # tfonts
 
+
+**We moved this project from scratch to its own at [https://github.com/fortio/tfonts#tfonts](https://github.com/fortio/tfonts#tfonts)**
+
 Demonstrates large true type font rending in the terminal with multiple options (from truecolor to mono).
 `tfonts` will show a given text in all the fonts it finds in the system or indicated `-fontdir`.
 Or use a specific `-font`. Use the left arrow key or backspace to navigate back, q,Q or Ctrl-C to exit.
@@ -9,8 +12,10 @@ Heavy lifting is using [ansipixels](https://github.com/fortio/terminal#fortioorg
 ## Install
 
 ```sh
-go install github.com/ldemailly/go-scratch/tfonts@latest
+go install fortio.org/tfonts@latest
 ```
+
+And see the [updated location](https://github.com/fortio/tfonts#tfonts) for Docker, brew, and binary releases.
 
 ## Example
 
