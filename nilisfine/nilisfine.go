@@ -1,6 +1,7 @@
 // Demonstrate nil dereference without panic/segv, works on Linux after
 // echo 0 > /proc/sys/vm/mmap_min_addr
 // ported from https://github.com/ldemailly/experimental/blob/master/misc-c/happynull.c
+// see no cgo version ../nilisfine_purego/nilisfine.go
 package main
 
 /*

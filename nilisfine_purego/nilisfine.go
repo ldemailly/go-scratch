@@ -4,6 +4,7 @@
 // Demonstrates nil dereference without panic/segv, works on Linux after
 // echo 0 > /proc/sys/vm/mmap_min_addr
 // ported from https://github.com/ldemailly/experimental/blob/master/misc-c/happynull.c
+// no cgo version of ../nilisfine/nilisfine.go
 package main
 
 import (
@@ -27,9 +28,7 @@ func init() {
 	addr := uintptr(0)
 	ret := mmap(addr, 4096, 0x3, 0x32, -1, 0)
 	if ret == ^uintptr(0) {
-		fmt.Println("mmap failed, run: echo 0 > /proc/sys/vm/mmap_min_addr")
-	} else {
-		fmt.Println("mmap succeeded at", ret)
+		fmt.Println("mmap failed, you need to run:\n\necho 0 > /proc/sys/vm/mmap_min_addr\n\nas is it will panic.")
 	}
 }
 
