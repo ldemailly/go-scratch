@@ -6,7 +6,6 @@ package main
 /*
 #include <sys/mman.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 
 __attribute__((constructor))
