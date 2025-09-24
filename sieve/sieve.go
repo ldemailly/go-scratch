@@ -41,6 +41,7 @@ type State struct {
 	padding   int
 	perLine   int
 	current   int
+	multiple  int
 	state     []bool // index is n-1
 	numPrimes int
 }
@@ -56,6 +57,7 @@ func (s *State) InitialState() error {
 	s.n, s.padding, s.perLine = calcN(s.ap.H, s.ap.W)
 	// Reset state
 	s.current = 1
+	s.multiple = 0
 	s.state = make([]bool, s.n) // all false == all possible primes.
 	var buf bytes.Buffer
 	for i := 1; i <= s.n; i++ {
@@ -75,10 +77,10 @@ func (s *State) InitialState() error {
 }
 
 func (s *State) Color() tcolor.Color {
-	hue := float64(s.numPrimes) * 17.3 / 100. // just some random number of hue steps so colors are far enough apart
+	hue := float64(s.numPrimes) * 37.3 / 100. // just some random number of hue steps so colors are far enough apart
 	// get the decimal part if greater than 1 / wrap
 	hue -= float64(int(hue))
-	return tcolor.HSLf(hue, 0.5, 0.5)
+	return tcolor.HSLf(hue, 0.7, 0.4)
 }
 
 func (s *State) ShowNumberAt(n int, prefix string, suffix string) {
@@ -98,7 +100,7 @@ func (s *State) Flag(n int) {
 }
 
 func main() {
-	fps := flag.Float64("fps", 60.0, "Frames per second")
+	fps := flag.Float64("fps", 120.0, "Frames per second")
 	flag.Parse()
 	ap := ansipixels.NewAnsiPixels(*fps)
 	err := ap.Open()
@@ -109,37 +111,53 @@ func main() {
 	s := &State{ap: ap}
 	ap.OnResize = s.InitialState
 	_ = ap.OnResize()
-	ap.WriteBoxed(ap.H/2, "Resize me, Q or ^C to quit, any key to start")
+	ap.WriteBoxed(ap.H/2, " Resize me, Q or ^C to quit \n any key to start, fps: %.0f ", *fps)
 	_ = ap.ReadOrResizeOrSignal()
 	_ = ap.OnResize() // redraw without the box
+	frame := 0
 	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
 		if len(s.ap.Data) > 0 {
 			c := ap.Data[0]
 			switch c {
 			case 'q', 3, 'Q':
+				ap.MoveCursor(0, ap.H)
 				return false
 			default:
 				// nothing else to do for now
 			}
 		}
 		if s.current*s.current >= s.n {
-			return true // all done
+			return true // all done just wait for resize or Quit
 		}
-		candidate := s.current + 1
-		for candidate <= s.n && s.IsFlagged(candidate) {
-			candidate++
+		// Either we're marking multiples of a prime or we find the next one:
+		if s.multiple == 0 { // find next one mode
+			candidate := s.current + 1
+			for candidate <= s.n && s.IsFlagged(candidate) {
+				candidate++
+			}
+			s.numPrimes++
+			color := s.Color()
+			s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color), tcolor.Reset)
+			s.current = candidate
+			s.multiple = candidate * candidate
+			return true
 		}
-		s.numPrimes++
+		// next multiple marking:
 		color := s.Color()
-		s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color), tcolor.Reset)
-		s.current = candidate
-		for multiple := candidate * candidate; multiple <= s.n; multiple += candidate {
-			if s.IsFlagged(multiple) {
+		frame++
+		// slowdown based on current number (2 fastest, updates every frame, higher primer slower)
+		if frame%(s.current-1) != 0 {
+			return true
+		}
+		for ; s.multiple <= s.n; s.multiple += s.current {
+			if s.IsFlagged(s.multiple) {
 				continue // already marked
 			}
-			s.Flag(multiple)
-			s.ShowNumberAt(multiple, s.ap.ColorOutput.Foreground(color), tcolor.Reset)
+			s.Flag(s.multiple)
+			s.ShowNumberAt(s.multiple, s.ap.ColorOutput.Foreground(color), tcolor.Reset)
+			return true // one at a time
 		}
+		s.multiple = 0 // done with this prime, back to find next one mode
 		return true
 	})
 	if err != nil {
