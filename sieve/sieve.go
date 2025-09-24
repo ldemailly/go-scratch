@@ -49,13 +49,14 @@ func (s *State) NumberAt(n int) (int, int) {
 	return ((n - 1) % s.perLine) * s.padding, (n - 1) / s.perLine
 }
 
+// Optimize the initial state where we can write it all in 1 string instead of cursor moving to each position
 func (s *State) InitialState() error {
-	// Optimize the initial state where we can write it all in 1 string instead of cursor moving to each position
-	s.current = 1
-	s.state = make([]bool, s.n) // all false == all possible primes.
 	s.ap.ClearScreen()
 	// Calculate and save sieve dimensions:
 	s.n, s.padding, s.perLine = calcN(s.ap.H, s.ap.W)
+	// Reset state
+	s.current = 1
+	s.state = make([]bool, s.n) // all false == all possible primes.
 	var buf bytes.Buffer
 	for i := 1; i <= s.n; i++ {
 		fmt.Fprintf(&buf, "%*d", -(s.padding - 1), i)
