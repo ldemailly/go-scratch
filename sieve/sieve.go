@@ -33,7 +33,8 @@ func calcN(height, width int) (int, int, int) {
 }
 
 func main() {
-	fps := flag.Float64("fps", 30.0, "Frames per second")
+	fps := flag.Float64("fps", 60.0, "Frames per second")
+	flag.Parse()
 	ap := ansipixels.NewAnsiPixels(*fps)
 	err := ap.Open()
 	if err != nil {
