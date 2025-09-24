@@ -2,7 +2,10 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"flag"
+	"fmt"
 
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
@@ -33,19 +36,64 @@ func calcN(height, width int) (int, int, int) {
 }
 
 type State struct {
-	ap      *ansipixels.AnsiPixels
-	n       int
-	padding int
-	perLine int
+	ap        *ansipixels.AnsiPixels
+	n         int
+	padding   int
+	perLine   int
+	current   int
+	state     []bool // index is n-1
+	numPrimes int
 }
 
 func (s *State) NumberAt(n int) (int, int) {
 	return ((n - 1) % s.perLine) * s.padding, (n - 1) / s.perLine
 }
 
-func (s *State) ShowNumberAt(n int, c tcolor.Color) {
+func (s *State) InitialState() error {
+	// Optimize the initial state where we can write it all in 1 string instead of cursor moving to each position
+	s.current = 1
+	s.state = make([]bool, s.n) // all false == all possible primes.
+	s.ap.ClearScreen()
+	// Calculate and save sieve dimensions:
+	s.n, s.padding, s.perLine = calcN(s.ap.H, s.ap.W)
+	var buf bytes.Buffer
+	for i := 1; i <= s.n; i++ {
+		fmt.Fprintf(&buf, "%*d", -(s.padding - 1), i)
+		if i == s.n {
+			break // so no extra newline scrolling it all at the end/last n
+		}
+		if i%s.perLine == 0 {
+			buf.WriteString("\r\n")
+		} else {
+			buf.WriteByte(' ')
+		}
+	}
+	s.ap.Out.Write(buf.Bytes())
+	s.ap.Out.Flush()
+	return nil
+}
+
+func (s *State) Color() tcolor.Color {
+	hue := float64(s.numPrimes) * 17.3 / 100. // just some random number of hue steps so colors are far enough apart
+	// get the decimal part if greater than 1 / wrap
+	hue -= float64(int(hue))
+	return tcolor.HSLf(hue, 0.5, 0.5)
+}
+
+func (s *State) ShowNumberAt(n int, prefix string, suffix string) {
 	x, y := s.NumberAt(n)
-	s.ap.WriteAt(x, y, "%s%d", s.ap.ColorOutput.Foreground(c), n)
+	s.ap.WriteAt(x, y, "%s%d%s", prefix, n, suffix)
+}
+
+func (s *State) DemoColor(n int) {
+	s.ShowNumberAt(n, s.ap.ColorOutput.Foreground(tcolor.HSLf(float64(n)/float64(s.n+1), 0.5, 0.5)), tcolor.Reset)
+}
+
+func (s *State) IsFlagged(n int) bool {
+	return s.state[n-1]
+}
+func (s *State) Flag(n int) {
+	s.state[n-1] = true
 }
 
 func main() {
@@ -58,30 +106,42 @@ func main() {
 	}
 	defer ap.Restore()
 	s := &State{ap: ap}
-	ap.OnResize = func() error {
-		ap.ClearScreen()
-		// Calculate and save sieve dimensions:
-		s.n, s.padding, s.perLine = calcN(ap.H, ap.W)
-		for i := 1; i <= s.n; i++ {
-			s.ShowNumberAt(i, tcolor.HSLf(float64(i)/float64(s.n+1), 0.5, 0.5))
-		}
-		return nil
-	}
+	ap.OnResize = s.InitialState
 	_ = ap.OnResize()
-	for {
-		ap.WriteBoxed(ap.H/2, "%sResize me, Q or ^C to quit", tcolor.Reset)
-		err := ap.ReadOrResizeOrSignal()
-		if err != nil {
-			panic(err)
-		}
-		if len(ap.Data) > 0 {
+	ap.WriteBoxed(ap.H/2, "Resize me, Q or ^C to quit, any key to start")
+	_ = ap.ReadOrResizeOrSignal()
+	_ = ap.OnResize() // redraw without the box
+	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
+		if len(s.ap.Data) > 0 {
 			c := ap.Data[0]
 			switch c {
 			case 'q', 3, 'Q':
-				return
+				return false
 			default:
 				// nothing else to do for now
 			}
 		}
+		if s.current*s.current >= s.n {
+			return true // all done
+		}
+		candidate := s.current + 1
+		for candidate <= s.n && s.IsFlagged(candidate) {
+			candidate++
+		}
+		s.numPrimes++
+		color := s.Color()
+		s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color), tcolor.Reset)
+		s.current = candidate
+		for multiple := candidate * candidate; multiple <= s.n; multiple += candidate {
+			if s.IsFlagged(multiple) {
+				continue // already marked
+			}
+			s.Flag(multiple)
+			s.ShowNumberAt(multiple, s.ap.ColorOutput.Foreground(color), tcolor.Reset)
+		}
+		return true
+	})
+	if err != nil {
+		panic(err)
 	}
 }
