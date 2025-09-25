@@ -77,7 +77,10 @@ func (s *State) InitialState() error {
 }
 
 func (s *State) Color() tcolor.Color {
-	hue := float64(s.numPrimes) * 37.3 / 100. // just some random number of hue steps so colors are far enough apart
+	hue := float64((s.numPrimes+1)/2) * 0.12345 // just some random number of hue steps so colors are far enough apart
+	if s.numPrimes%2 == 0 {
+		hue = hue + 0.5 // alternate direction for even/odd to get next color opposite to previous
+	}
 	// get the decimal part if greater than 1 / wrap
 	hue -= float64(int(hue))
 	return tcolor.HSLf(hue, 0.7, 0.4)
