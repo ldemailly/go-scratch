@@ -54,7 +54,8 @@ func (s *State) NumberAt(n int) (int, int) {
 func (s *State) InitialState() error {
 	s.ap.ClearScreen()
 	// Calculate and save sieve dimensions:
-	s.n, s.padding, s.perLine = calcN(s.ap.H, s.ap.W)
+	// leave the last line empty so on exit the whole sieve is visible.
+	s.n, s.padding, s.perLine = calcN(s.ap.H-1, s.ap.W)
 	// Reset state
 	s.current = 1
 	s.multiple = 0
@@ -123,14 +124,13 @@ func main() {
 			c := ap.Data[0]
 			switch c {
 			case 'q', 3, 'Q':
-				ap.MoveCursor(0, ap.H)
-				return false
+				return false // exit requested
 			default:
 				// nothing else to do for now
 			}
 		}
 		if s.current*s.current >= s.n {
-			return true // all done just wait for resize or Quit
+			return false // all done
 		}
 		// Either we're marking multiples of a prime or we find the next one:
 		if s.multiple == 0 { // find next one mode
@@ -140,6 +140,9 @@ func main() {
 			}
 			s.numPrimes++
 			color := s.Color()
+			s.ap.MoveCursor(0, ap.H-1)
+			s.ap.ClearEndOfLine()
+			s.ap.WriteCentered(ap.H-1, "Next Prime found: %d", candidate)
 			s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color), tcolor.Reset)
 			s.current = candidate
 			s.multiple = candidate * candidate
@@ -157,6 +160,7 @@ func main() {
 				continue // already marked
 			}
 			s.Flag(s.multiple)
+			s.ap.WriteCentered(ap.H-1, "Marking multiples of %d - marking %d", s.current, s.multiple)
 			s.ShowNumberAt(s.multiple, s.ap.ColorOutput.Foreground(color), tcolor.Reset)
 			return true // one at a time
 		}
@@ -166,4 +170,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	ap.MoveCursor(0, ap.H)
+	ap.ClearEndOfLine()
 }
