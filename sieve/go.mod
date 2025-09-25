@@ -1,8 +1,8 @@
 module github.com/ldemailly/go-scratch/sieve
 
-go 1.24.0
+go 1.23.0
 
-require fortio.org/terminal v0.54.0
+require fortio.org/terminal v0.55.0
 
 require (
 	fortio.org/log v1.17.2 // indirect

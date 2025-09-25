@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
@@ -14,15 +15,15 @@ import (
 // returns the N and width of each cell and how many cell per line - eg 700 and 4 (3+1) and p, or 2300 and 5 (4+1) and q.
 func calcN(height, width int) (int, int, int) {
 	// Find number of digits (start with 3 and try 4)
-	spaceUsedPer := 3 + 1                 // + 1 space in between
-	perLine := (width + 1) / spaceUsedPer // + 1 because last space is not needed
+	spaceUsedPer := 3 + 1 // + 1 space in between
+	perLine := width / spaceUsedPer
 	total := perLine * height
 	if total < 1000 {
 		return total, spaceUsedPer, perLine
 	}
 	// try 4
 	spaceUsedPer++
-	nPerLine := (width + 1) / spaceUsedPer
+	nPerLine := width / spaceUsedPer
 	ntotal := nPerLine * height
 	// could be back to 3 digits on border cases
 	if ntotal < 1000 {
@@ -44,6 +45,9 @@ type State struct {
 	multiple  int
 	state     []bool // index is n-1
 	numPrimes int
+	angle     float64
+	chroma    float64
+	lightness float64
 }
 
 func (s *State) NumberAt(n int) (int, int) {
@@ -52,6 +56,7 @@ func (s *State) NumberAt(n int) (int, int) {
 
 // Optimize the initial state where we can write it all in 1 string instead of cursor moving to each position
 func (s *State) InitialState() error {
+	s.ap.WriteString(tcolor.Reset)
 	s.ap.ClearScreen()
 	// Calculate and save sieve dimensions:
 	// leave the last line empty so on exit the whole sieve is visible.
@@ -62,7 +67,7 @@ func (s *State) InitialState() error {
 	s.state = make([]bool, s.n) // all false == all possible primes.
 	var buf bytes.Buffer
 	for i := 1; i <= s.n; i++ {
-		fmt.Fprintf(&buf, "%*d", -(s.padding - 1), i)
+		fmt.Fprintf(&buf, "%*d", (s.padding - 1), i)
 		if i == s.n {
 			break // so no extra newline scrolling it all at the end/last n
 		}
@@ -78,22 +83,18 @@ func (s *State) InitialState() error {
 }
 
 func (s *State) Color() tcolor.Color {
-	hue := float64((s.numPrimes+1)/2) * 0.12345 // just some random number of hue steps so colors are far enough apart
-	if s.numPrimes%2 == 0 {
-		hue = hue + 0.5 // alternate direction for even/odd to get next color opposite to previous
-	}
-	// get the decimal part if greater than 1 / wrap
+	hue := float64(s.numPrimes) * s.angle // trying to get nice steps.
 	hue -= float64(int(hue))
-	return tcolor.HSLf(hue, 0.7, 0.4)
+	return tcolor.Oklchf(s.lightness, s.chroma, hue)
 }
 
-func (s *State) ShowNumberAt(n int, prefix string, suffix string) {
+func (s *State) ShowNumberAt(n int, prefix string) {
 	x, y := s.NumberAt(n)
-	s.ap.WriteAt(x, y, "%s%d%s", prefix, n, suffix)
+	s.ap.WriteAt(x, y, "%s%*d ", prefix, s.padding-1, n)
 }
 
 func (s *State) DemoColor(n int) {
-	s.ShowNumberAt(n, s.ap.ColorOutput.Foreground(tcolor.HSLf(float64(n)/float64(s.n+1), 0.5, 0.5)), tcolor.Reset)
+	s.ShowNumberAt(n, s.ap.ColorOutput.Foreground(tcolor.HSLf(float64(n)/float64(s.n+1), 0.5, 0.5)))
 }
 
 func (s *State) IsFlagged(n int) bool {
@@ -105,6 +106,7 @@ func (s *State) Flag(n int) {
 
 func main() {
 	fps := flag.Float64("fps", 120.0, "Frames per second")
+	palette := flag.Bool("palette", false, "Just show the palette")
 	flag.Parse()
 	ap := ansipixels.NewAnsiPixels(*fps)
 	err := ap.Open()
@@ -112,7 +114,34 @@ func main() {
 		panic(err)
 	}
 	defer ap.Restore()
-	s := &State{ap: ap}
+	// Golden angle https://en.wikipedia.org/wiki/Golden_angle
+	// 2-phi == 1 - 1/phi == 1/phi^2 (!)
+	s := &State{ap: ap, angle: 2 - math.Phi, chroma: 0.5, lightness: 0.7}
+	if *palette {
+		for _, chroma := range []float64{0.4, 0.45, 0.5, 0.55, 0.6} {
+			s.chroma = chroma
+			for _, lightness := range []float64{0.4, 0.5, 0.6, 0.7} {
+				s.lightness = lightness
+				for _, angle := range []struct {
+					name  string
+					angle float64
+				}{{"Golden angle", 2 - math.Phi}} {
+					s.angle = angle.angle
+					fmt.Printf("Palette with chroma %.1f lightness %.1f angle %s %f\r\n", s.chroma, s.lightness, angle.name, angle.angle)
+					for i := range 39 {
+						n := i + 1
+						s.numPrimes = i
+						fmt.Printf("%s%3d ", s.ap.ColorOutput.Background(s.Color()), n)
+						if n%13 == 0 {
+							fmt.Printf("%s\r\n", tcolor.Reset)
+						}
+					}
+					fmt.Printf("%s\r\n", tcolor.Reset)
+				}
+			}
+		}
+		return
+	}
 	ap.OnResize = s.InitialState
 	_ = ap.OnResize()
 	ap.WriteBoxed(ap.H/2, " Resize me, Q or ^C to quit \n any key to start, fps: %.0f ", *fps)
@@ -139,16 +168,18 @@ func main() {
 				candidate++
 			}
 			s.numPrimes++
+			s.lightness = 0.75
 			color := s.Color()
-			s.ap.MoveCursor(0, ap.H-1)
+			s.ap.WriteAtStr(0, ap.H-1, tcolor.Reset)
 			s.ap.ClearEndOfLine()
 			s.ap.WriteCentered(ap.H-1, "Next Prime found: %d", candidate)
-			s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color), tcolor.Reset)
+			s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color)+ansipixels.Bold+ansipixels.Underlined)
 			s.current = candidate
 			s.multiple = candidate * candidate
 			return true
 		}
 		// next multiple marking:
+		s.lightness = 0.7
 		color := s.Color()
 		frame++
 		// slowdown based on current number (2 fastest, updates every frame, higher primer slower)
@@ -160,8 +191,8 @@ func main() {
 				continue // already marked
 			}
 			s.Flag(s.multiple)
-			s.ap.WriteCentered(ap.H-1, "Marking multiples of %d - marking %d", s.current, s.multiple)
-			s.ShowNumberAt(s.multiple, s.ap.ColorOutput.Foreground(color), tcolor.Reset)
+			s.ap.WriteCentered(ap.H-1, "%sMarking multiples of %d - marking %d%s", tcolor.Reset, s.current, s.multiple, tcolor.Black.Foreground())
+			s.ShowNumberAt(s.multiple, s.ap.ColorOutput.Background(color))
 			return true // one at a time
 		}
 		s.multiple = 0 // done with this prime, back to find next one mode
@@ -170,6 +201,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	ap.MoveCursor(0, ap.H)
+	ap.WriteAt(0, ap.H, tcolor.Reset)
 	ap.ClearEndOfLine()
 }
