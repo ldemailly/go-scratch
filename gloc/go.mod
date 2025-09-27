@@ -1,9 +1,9 @@
 module github.com/ldemailly/go-scratch/gloc
 
-go 1.24.5
+go 1.23.0
 
 require (
-	fortio.org/cli v1.10.0
+	fortio.org/cli v1.11.0
 	fortio.org/log v1.17.2
 )
 
