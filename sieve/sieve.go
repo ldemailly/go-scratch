@@ -201,12 +201,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	ap.WriteAt(0, ap.H, tcolor.Reset)
+	ap.WriteCentered(ap.H, "%sAll done (after %d), press a key to list primes found and exit ...", tcolor.Reset, s.current)
+	s.ap.ReadOrResizeOrSignal() // pause at the end
+	ap.MoveCursor(0, ap.H)
+	ap.SaveCursorPos()
 	ap.ClearEndOfLine()
+	fmt.Fprintln(ap.Logger, "Primes found:")
 	for i := 2; i <= min(s.n, s.current*s.current); i++ {
 		if !s.IsFlagged(i) {
-			fmt.Fprintf(ap.Out, "%d ", i)
+			fmt.Fprintf(ap.Logger, "%d ", i)
 		}
 	}
-	ap.Out.Write([]byte("\r\n"))
+	fmt.Fprintln(ap.Logger)
 }
