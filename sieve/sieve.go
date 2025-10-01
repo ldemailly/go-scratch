@@ -43,7 +43,7 @@ type State struct {
 	perLine   int
 	current   int
 	multiple  int
-	state     []bool // index is n-1
+	state     []bool // index is n-2
 	numPrimes int
 	angle     float64
 	chroma    float64
@@ -64,7 +64,7 @@ func (s *State) InitialState() error {
 	// Reset state
 	s.current = 1
 	s.multiple = 0
-	s.state = make([]bool, s.n) // all false == all possible primes.
+	s.state = make([]bool, s.n-1) // all false == all possible primes. (starting at 2)
 	var buf bytes.Buffer
 	for i := 1; i <= s.n; i++ {
 		fmt.Fprintf(&buf, "%*d", (s.padding - 1), i)
@@ -98,10 +98,10 @@ func (s *State) DemoColor(n int) {
 }
 
 func (s *State) IsFlagged(n int) bool {
-	return s.state[n-1]
+	return s.state[n-2]
 }
 func (s *State) Flag(n int) {
-	s.state[n-1] = true
+	s.state[n-2] = true
 }
 
 func main() {
@@ -203,4 +203,10 @@ func main() {
 	}
 	ap.WriteAt(0, ap.H, tcolor.Reset)
 	ap.ClearEndOfLine()
+	for i := 2; i <= min(s.n, s.current*s.current); i++ {
+		if !s.IsFlagged(i) {
+			fmt.Fprintf(ap.Out, "%d ", i)
+		}
+	}
+	ap.Out.Write([]byte("\r\n"))
 }
