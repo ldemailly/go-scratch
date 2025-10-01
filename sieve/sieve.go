@@ -148,6 +148,7 @@ func main() {
 	_ = ap.ReadOrResizeOrSignal()
 	_ = ap.OnResize() // redraw without the box
 	frame := 0
+	stoppedEarly := true
 	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
 		if len(s.ap.Data) > 0 {
 			c := ap.Data[0]
@@ -159,6 +160,7 @@ func main() {
 			}
 		}
 		if s.current*s.current >= s.n {
+			stoppedEarly = false
 			return false // all done
 		}
 		// Either we're marking multiples of a prime or we find the next one:
@@ -201,7 +203,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	ap.WriteCentered(ap.H, "%sAll done (after %d), press a key to list primes found and exit ...", tcolor.Reset, s.current)
+	if stoppedEarly {
+		ap.WriteCentered(ap.H, "%sStopped while marking %d, press a key to list primes found and exit ...", tcolor.Reset, s.current)
+	} else {
+		ap.WriteCentered(ap.H, "%sAll done (after %d), press a key to list primes found and exit ...", tcolor.Reset, s.current)
+	}
 	s.ap.ReadOrResizeOrSignal() // pause at the end
 	ap.MoveCursor(0, ap.H)
 	ap.SaveCursorPos()
