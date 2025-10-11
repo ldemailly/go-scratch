@@ -53,7 +53,8 @@ func (s *State) NumberAt(n int) (int, int) {
 	return ((n - 1) % s.perLine) * s.padding, (n - 1) / s.perLine
 }
 
-// Optimize the initial state where we can write it all in 1 string instead of cursor moving to each position
+// InitialState optimizes the initial state where we can write it
+// all in 1 string instead of cursor moving to each position.
 func (s *State) InitialState() error {
 	s.ap.WriteString(tcolor.Reset)
 	s.ap.ClearScreen()
@@ -76,8 +77,8 @@ func (s *State) InitialState() error {
 			buf.WriteByte(' ')
 		}
 	}
-	s.ap.Out.Write(buf.Bytes())
-	s.ap.Out.Flush()
+	_, _ = s.ap.Out.Write(buf.Bytes())
+	_ = s.ap.Out.Flush()
 	return nil
 }
 
@@ -99,11 +100,12 @@ func (s *State) DemoColor(n int) {
 func (s *State) IsFlagged(n int) bool {
 	return s.state[n-2]
 }
+
 func (s *State) Flag(n int) {
 	s.state[n-2] = true
 }
 
-func main() {
+func main() { //nolint: gocognit // a bit big one function demo indeed.
 	fps := flag.Float64("fps", 120.0, "Frames per second")
 	palette := flag.Bool("palette", false, "Just show the palette")
 	flag.Parse()
@@ -174,7 +176,7 @@ func main() {
 			s.ap.WriteAtStr(0, ap.H-1, tcolor.Reset)
 			s.ap.ClearEndOfLine()
 			s.ap.WriteCentered(ap.H-1, "Next Prime found: %d", candidate)
-			s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color)+ansipixels.Bold+ansipixels.Underlined)
+			s.ShowNumberAt(candidate, s.ap.ColorOutput.Background(color)+tcolor.Bold+tcolor.Underlined)
 			s.current = candidate
 			s.multiple = candidate * candidate
 			return true
@@ -192,7 +194,8 @@ func main() {
 				continue // already marked
 			}
 			s.Flag(s.multiple)
-			s.ap.WriteCentered(ap.H-1, "%sMarking multiples of %d - marking %d%s", tcolor.Reset, s.current, s.multiple, tcolor.Black.Foreground())
+			s.ap.WriteCentered(ap.H-1, "%sMarking multiples of %d - marking %d%s",
+				tcolor.Reset, s.current, s.multiple, tcolor.Black.Foreground())
 			s.ShowNumberAt(s.multiple, s.ap.ColorOutput.Background(color))
 			return true // one at a time
 		}
@@ -207,7 +210,7 @@ func main() {
 	} else {
 		ap.WriteCentered(ap.H, "%sAll done (after %d), press a key to list primes found and exit ...", tcolor.Reset, s.current)
 	}
-	s.ap.ReadOrResizeOrSignal() // pause at the end
+	_ = s.ap.ReadOrResizeOrSignal() // pause at the end
 	ap.MoveCursor(0, ap.H)
 	ap.SaveCursorPos()
 	ap.ClearEndOfLine()
