@@ -3,7 +3,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"flag"
 	"fmt"
 	"math"
@@ -149,7 +148,7 @@ func main() {
 	_ = ap.OnResize() // redraw without the box
 	frame := 0
 	stoppedEarly := true
-	err = ap.FPSTicks(context.Background(), func(_ context.Context) bool {
+	err = ap.FPSTicks(func() bool {
 		if len(s.ap.Data) > 0 {
 			c := ap.Data[0]
 			switch c {
