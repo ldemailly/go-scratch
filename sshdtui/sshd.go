@@ -6,16 +6,33 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"os"
+	"syscall"
 	"time"
 
 	"fortio.org/log"
 	"fortio.org/scli"
+	"fortio.org/terminal"
 	"fortio.org/terminal/ansipixels"
 	"github.com/gliderlabs/ssh"
 	gossh "golang.org/x/crypto/ssh"
 )
 
 const KeyFile = "./host_key"
+
+type InputAdapter struct {
+	ansipixels.InputReader
+}
+
+func (ia InputAdapter) RawMode() error {
+	return nil
+}
+
+func (ia InputAdapter) NormalMode() error {
+	return nil
+}
+
+func (ia InputAdapter) StartDirect() {
+}
 
 func Handler(s ssh.Session) {
 	p, c, ok := s.Pty()
@@ -26,29 +43,61 @@ func Handler(s ssh.Session) {
 		FPS: 60,
 		H:   height,
 		W:   width,
+		C:   make(chan os.Signal, 1),
+	}
+	fps := 60
+	timeout := time.Duration(1000/fps) * time.Millisecond
+	ir := terminal.NewTimeoutReader(s, timeout)
+	ia := InputAdapter{ir}
+	ap.SharedInput = ia
+	ap.GetSize = func() error {
+		ap.W, ap.H = width, height
+		return nil
 	}
 	ap.ClearScreen()
-	ap.WriteBoxed(ap.H/2-1, "Hello, SSH!\nInitial terminal width: %d, height: %d\nResize me!", width, height)
+	ap.WriteBoxed(ap.H/2-1, "Hello, SSH!\nInitial terminal width: %d, height: %d\nResize me!\nQ to quit", width, height)
 	ap.EndSyncMode()
-
-	for {
+	ap.OnResize = func() error {
+		ap.ClearScreen()
+		ap.WriteBoxed(ap.H/2-3, "Window size changed:\n%d x %d ", width, height)
+		ap.EndSyncMode()
+		return nil
+	}
+	keepGoing := true
+	for keepGoing {
 		select {
-		// case <-s.Read():
 		case w := <-c:
 			if w.Width == width && w.Height == height {
 				continue
 			}
 			width, height = w.Width, w.Height
-			ap.H = height
-			ap.W = width
-			ap.ClearScreen()
-			ap.WriteBoxed(ap.H/2-3, "Window size changed:\n%d x %d ", width, height)
-			ap.EndSyncMode()
+			log.Infof("Window resized to %dx%d", width, height)
+			ap.C <- syscall.SIGWINCH
 		case <-time.After(10 * time.Second):
 			ap.WriteAt(0, ap.H-2, "No window size change for 10 seconds, closing session.")
 			ap.MoveCursor(0, ap.H-1)
 			ap.EndSyncMode()
 			return
+		default:
+			n, err := ap.ReadOrResizeOrSignalOnce()
+			if err != nil {
+				log.Errf("Error reading input or resizing or signaling: %v", err)
+				return
+			}
+			if n == 0 {
+				continue
+			}
+			c := ap.Data[0]
+			switch c {
+			case 3, 'q': // Ctrl-C or 'q'
+				ap.WriteAt(0, ap.H-2, "Exit requested, closing session.")
+				keepGoing = false
+			default:
+				// echo back
+				ap.WriteAt(0, ap.H-2, "Received %q", ap.Data)
+				ap.ClearEndOfLine()
+			}
+			ap.EndSyncMode()
 		}
 	}
 }
