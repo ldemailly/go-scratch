@@ -73,16 +73,11 @@ func Handler(s ssh.Session) {
 			width, height = w.Width, w.Height
 			log.Infof("Window resized to %dx%d", width, height)
 			ap.C <- syscall.SIGWINCH
-		case <-time.After(10 * time.Second):
-			ap.WriteAt(0, ap.H-2, "No window size change for 10 seconds, closing session.")
-			ap.MoveCursor(0, ap.H-1)
-			ap.EndSyncMode()
-			return
 		default:
 			n, err := ap.ReadOrResizeOrSignalOnce()
 			if err != nil {
 				log.Errf("Error reading input or resizing or signaling: %v", err)
-				return
+				keepGoing = false
 			}
 			if n == 0 {
 				continue
@@ -97,8 +92,8 @@ func Handler(s ssh.Session) {
 				ap.WriteAt(0, ap.H-2, "Received %q", ap.Data)
 				ap.ClearEndOfLine()
 			}
-			ap.EndSyncMode()
 		}
+		ap.EndSyncMode()
 	}
 }
 
