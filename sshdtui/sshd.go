@@ -72,7 +72,13 @@ func Handler(s ssh.Session) {
 			}
 			width, height = w.Width, w.Height
 			log.Infof("Window resized to %dx%d", width, height)
-			ap.C <- syscall.SIGWINCH
+			// Only send if it's not already queued
+			select {
+			case ap.C <- syscall.SIGWINCH:
+				// signal sent
+			default:
+				// channel full; nothing to do (will get processed in next ReadOrResizeOrSignalOnce)
+			}
 		default:
 			n, err := ap.ReadOrResizeOrSignalOnce()
 			if err != nil {
