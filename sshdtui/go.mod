@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	fortio.org/log v1.18.3
 	fortio.org/scli v1.19.0
-	fortio.org/terminal v0.61.1-0.20251116181250-094f9ee8d05d
+	fortio.org/terminal v0.61.1-0.20251120014524-0642ce262846
 	github.com/gliderlabs/ssh v0.3.9-0.20250127223818-909fa952d4e4
 	golang.org/x/crypto v0.43.0
 )

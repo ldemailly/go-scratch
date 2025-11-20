@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"os"
-	"syscall"
 	"time"
 
 	"fortio.org/log"
@@ -74,7 +73,7 @@ func Handler(s ssh.Session) {
 			log.Infof("Window resized to %dx%d", width, height)
 			// Only send if it's not already queued
 			select {
-			case ap.C <- syscall.SIGWINCH:
+			case ap.C <- ansipixels.ResizeSignal:
 				// signal sent
 			default:
 				// channel full; nothing to do (will get processed in next ReadOrResizeOrSignalOnce)
