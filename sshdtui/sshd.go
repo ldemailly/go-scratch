@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/pem"
+	"flag"
 	"os"
 	"time"
 
@@ -34,6 +35,7 @@ func (ia InputAdapter) StartDirect() {
 }
 
 func Handler(s ssh.Session) {
+	log.Infof("New SSH session from %v user=%s", s.RemoteAddr(), s.User())
 	p, c, ok := s.Pty()
 	log.S(log.Info, "Pty:", log.Any("pty", p), log.Any("ok", ok))
 	width, height := p.Window.Width, p.Window.Height
@@ -54,7 +56,7 @@ func Handler(s ssh.Session) {
 		return nil
 	}
 	ap.ClearScreen()
-	ap.WriteBoxed(ap.H/2-1, "Hello, SSH!\nInitial terminal width: %d, height: %d\nResize me!\nQ to quit", width, height)
+	ap.WriteBoxed(ap.H/2-1, "Ansipixels sshd demo!\nInitial terminal width: %d, height: %d\nResize me!\nQ to quit", width, height)
 	ap.EndSyncMode()
 	ap.OnResize = func() error {
 		ap.ClearScreen()
@@ -128,7 +130,9 @@ func CheckKeyFile(keyFile string) {
 }
 
 func main() {
+	port := flag.String("port", ":2222", "Port/address to listen on")
 	scli.ServerMain()
 	CheckKeyFile(KeyFile)
-	log.Fatalf("%v", ssh.ListenAndServe(":2222", Handler, ssh.HostKeyFile(KeyFile)))
+	log.Infof("Starting SSH server on %s", *port)
+	log.Fatalf("%v", ssh.ListenAndServe(*port, Handler, ssh.HostKeyFile(KeyFile)))
 }
