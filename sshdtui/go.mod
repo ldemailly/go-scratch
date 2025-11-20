@@ -7,7 +7,7 @@ require (
 	fortio.org/scli v1.19.0
 	fortio.org/terminal v0.62.0
 	github.com/gliderlabs/ssh v0.3.9-0.20250127223818-909fa952d4e4
-	golang.org/x/crypto v0.43.0
+	golang.org/x/crypto v0.45.0
 )
 
 require (
