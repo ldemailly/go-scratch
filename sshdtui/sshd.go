@@ -1,4 +1,4 @@
-// Deprecated: This has moved to https://github.com/fortio/sshd
+// Deprecated: This has moved to https://github.com/fortio/sshdtui
 package main
 
 import (
