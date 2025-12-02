@@ -28,12 +28,20 @@ var (
 	procAttachThreadInput        = user32.NewProc("AttachThreadInput")
 	procBringWindowToTop         = user32.NewProc("BringWindowToTop")
 	procGetClassNameW            = user32.NewProc("GetClassNameW")
+	procKeybdEvent               = user32.NewProc("keybd_event")
 )
 
 const (
 	SW_RESTORE           = 9
 	MOUSEEVENTF_LEFTDOWN = 0x0002
 	MOUSEEVENTF_LEFTUP   = 0x0004
+	KEYEVENTF_KEYUP      = 0x0002
+	// Virtual-Key codes for arrow keys
+	VK_LEFT  = 0x25
+	VK_UP    = 0x26
+	VK_RIGHT = 0x27
+	VK_DOWN  = 0x28
+	SPACE    = 0x20
 )
 
 type RECT struct {
@@ -96,6 +104,26 @@ func BringWindowToFront(hwnd uintptr) error {
 	procSetForegroundWindow.Call(hwnd)
 	procBringWindowToTop.Call(hwnd)
 	procAttachThreadInput.Call(uintptr(curTid), uintptr(targetTid), 0)
+	return nil
+}
+
+// SendKeyToWindow brings the window to front and sends a key via keybd_event.
+// vk is a Windows virtual-key code (e.g., VK_LEFT, VK_UP).
+func SendKeyToWindow(hwnd uintptr, vk uint16) error {
+	if hwnd == 0 {
+		return errors.New("invalid hwnd")
+	}
+	// Bring to foreground to ensure the keystroke is received
+	if err := BringWindowToFront(hwnd); err != nil {
+		return err
+	}
+	// small delay to allow focus change
+	time.Sleep(30 * time.Millisecond)
+	// key down
+	procKeybdEvent.Call(uintptr(vk), 0, 0, 0)
+	time.Sleep(30 * time.Millisecond)
+	// key up
+	procKeybdEvent.Call(uintptr(vk), 0, uintptr(KEYEVENTF_KEYUP), 0)
 	return nil
 }
 
