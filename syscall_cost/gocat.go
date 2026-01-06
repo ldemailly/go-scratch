@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-const bufSize = 1024
+const bufSize = 128 // small on purpose to get lots of syscalls
 
 func fileCat() int64 {
 	var buf [bufSize]byte
