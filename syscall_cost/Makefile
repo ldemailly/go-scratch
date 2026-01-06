@@ -1,6 +1,6 @@
 
 
-all: bench1 bench2
+all: check bench1 bench2
 
 WARMUP:=5
 
@@ -19,6 +19,11 @@ gocat26: gocat.go
 /tmp/bigfile:
 	dd if=/dev/zero of=/tmp/bigfile bs=1M count=100
 
+check: /tmp/bigfile gocat24 gocat25 gocat26 ccat
+	./ccat < /tmp/bigfile > /dev/null
+	./gocat24 -syscall < /tmp/bigfile > /dev/null
+	./gocat24 < /tmp/bigfile > /dev/null
+
 bench1: /tmp/bigfile gocat24 gocat25 gocat26 ccat
 	hyperfine --warmup=$(WARMUP) \
 		"./ccat < /tmp/bigfile > /dev/null" \
@@ -34,4 +39,4 @@ bench2: /tmp/bigfile gocat26
 clean:
 	$(RM) /tmp/bigfile ccat gocat24 gocat25 gocat26
 
-.PHONY: bench1 bench2 clean all
+.PHONY: bench1 bench2 clean all check
