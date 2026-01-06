@@ -31,4 +31,7 @@ bench2: /tmp/bigfile gocat26
 		"./gocat26 < /tmp/bigfile > /dev/null" \
 		"./gocat26 -syscall < /tmp/bigfile > /dev/null"
 
-.PHONY: bench1 bench2
+clean:
+	$(RM) /tmp/bigfile ccat gocat24 gocat25 gocat26
+
+.PHONY: bench1 bench2 clean all
