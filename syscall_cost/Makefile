@@ -14,6 +14,6 @@ gocat: gocat.go
 	dd if=/dev/zero of=/tmp/bigfile bs=1M count=100
 
 bench: /tmp/bigfile gocat ccat
-	hyperfine --warmup=5 "./gocat < /tmp/bigfile > /dev/null" "./ccat < /tmp/bigfile > /dev/null"
+	hyperfine --warmup=5 "./ccat < /tmp/bigfile > /dev/null" "./gocat < /tmp/bigfile > /dev/null"
 
 .PHONY: bench
