@@ -1,7 +1,8 @@
 
 
-all: bench
+all: bench1 bench2
 
+WARMUP:=5
 
 ccat: ccat.c
 	gcc -Wall -Wextra -pedantic -Werror -O3 -o ccat ccat.c
@@ -18,7 +19,16 @@ gocat26: gocat.go
 /tmp/bigfile:
 	dd if=/dev/zero of=/tmp/bigfile bs=1M count=100
 
-bench: /tmp/bigfile gocat24 gocat25 gocat26 ccat
-	hyperfine --warmup=5 "./ccat < /tmp/bigfile > /dev/null" "./gocat24 < /tmp/bigfile > /dev/null" "./gocat25 < /tmp/bigfile > /dev/null" "./gocat26 < /tmp/bigfile > /dev/null"
+bench1: /tmp/bigfile gocat24 gocat25 gocat26 ccat
+	hyperfine --warmup=$(WARMUP) \
+		"./ccat < /tmp/bigfile > /dev/null" \
+		"./gocat24 -syscall < /tmp/bigfile > /dev/null" \
+		"./gocat25 -syscall < /tmp/bigfile > /dev/null" \
+		"./gocat26 -syscall < /tmp/bigfile > /dev/null"
 
-.PHONY: bench
+bench2: /tmp/bigfile gocat26
+	hyperfine --warmup=$(WARMUP) \
+		"./gocat26 < /tmp/bigfile > /dev/null" \
+		"./gocat26 -syscall < /tmp/bigfile > /dev/null"
+
+.PHONY: bench1 bench2
