@@ -19,16 +19,12 @@ func main() {
 	}
 	defer ap.Restore()
 	ap.SyncBackgroundColor()
-	size := ap.W
-	if 2*ap.H < ap.W {
-		size = 2 * ap.H
-	}
+	size := 2 * min(ap.W, 2*ap.H) // super sample to get nicer edges.
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	for py := 0; py < size; py++ {
-		for px := 0; px < size; px++ {
-			// Convert pixel coords to mathematical coords
+	for py := range size {
+		for px := range size {
 			x := -1.5 + 3.0*float64(px)/float64(size-1)
-			y := 1.5 - 3.0*float64(py)/float64(size-1) // Flip y for screen coords
+			y := 1.5 - 3.0*float64(py)/float64(size-1)
 			z := heartEquation(x, y)
 			if z <= 0 {
 				img.Set(px, py, color.RGBA{R: 255, G: 0, B: 0, A: 255})
@@ -36,8 +32,7 @@ func main() {
 		}
 	}
 	ap.ClearScreen()
-	ap.ShowScaledImage(img)
-	msg := "Happy Valentine [(x^2+y^2-1)^3 = x^2 y^3]"
-	ap.WriteAt(size/2-len(msg)/2, 0, msg)
+	_ = ap.ShowImages(&ansipixels.Image{Images: []*image.RGBA{img}}, 1, 0, 1)
+	ap.WriteCentered(1, "Happy Valentine [(x^2+y^2-1)^3 = x^2 y^3]")
 	ap.MoveCursor(0, ap.H-1)
 }
