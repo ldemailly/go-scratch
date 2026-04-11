@@ -38,9 +38,9 @@ func main() {
 			z[i] = 127
 		}
 		sj, cj := 0, 1024
-		for j := 0; j < 90; j++ {
+		for range 90 {
 			si, ci := 0, 1024
-			for i := 0; i < 324; i++ {
+			for range 324 {
 				x0 := R1*cj + R2
 				x1 := (ci * x0) >> 10
 				x2 := (cA * sj) >> 10
@@ -74,7 +74,7 @@ func main() {
 			copy(out[p:], "\x1b[23A")
 			p += 5
 		}
-		for k := 0; k < 1761; k++ {
+		for k := range 1761 {
 			if k%80 != 0 {
 				out[p] = b[k]
 			} else {
