@@ -55,8 +55,7 @@ func main() {
 				n := (((-cA*x7 - cB*(((-sA*x7)>>10)+x2) - ci*((cj*sB)>>10)) >> 10) - x5) >> 7
 
 				o := x + 80*y
-				zz := int8((x6 - K2) >> 15)
-
+				zz := int8((x6 - K2) >> 15) //nolint:gosec // after >>15 it fits in int8
 				if y > 0 && y < 22 && x > 0 && x < 80 && zz < z[o] {
 					z[o] = zz
 					if n > 0 {
